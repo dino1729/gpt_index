@@ -1,5 +1,7 @@
 import os
-os.environ['OPENAI_API_KEY'] = "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"
+
+#Get API key from environment variable
+os.environ['OPENAI_API_KEY'] = os.environ.get('OPENAIAPIKEY')
 
 from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 from IPython.display import Markdown, display
