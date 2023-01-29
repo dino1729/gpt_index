@@ -11,8 +11,8 @@ os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 if not os.path.exists("data"):
     os.mkdir("data")
 if not os.path.exists("data/video.mp4"):
-    # yt = YouTube("https://www.youtube.com/watch?v=OYk5g88PreQ")
-    yt = YouTube("https://www.youtube.com/watch?v=UF8uR6Z6KLc")
+    # Get YouTube URL from user
+    yt = YouTube(input("Enter YouTube URL: "))
     yt.streams.filter(progressive=True, file_extension="mp4").order_by(
         "resolution"
     ).desc().first().download("data", filename="video.mp4")
@@ -20,20 +20,15 @@ if not os.path.exists("data/video.mp4"):
 documents = SimpleDirectoryReader("data").load_data()
 index = GPTSimpleVectorIndex(documents)
 
-# response = index.query("Which player came on as a substitute for Chelsea in the match?")
-# print(response)
-# print("----------------------------------")
-# response = index.query("Who won the match?")
-# print(response)
-
-response = index.query("What are the three stories from the speaker's life?")
+# Get the guestion from user
+question1 = input("Enter your first question: ")
+response = index.query(question1)
 print(response)
 
 print("----------------------------------")
 
-response = index.query(
-    "Who and why did she refuse to sign the speaker's final adoption papers?"
-)
+question2 = input("Enter your second question: ")
+response = index.query(question2)
 print(response)
 
 # save to disk
