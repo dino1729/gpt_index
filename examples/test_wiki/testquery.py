@@ -10,12 +10,14 @@ from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 documents = SimpleDirectoryReader("data").load_data()
 index = GPTSimpleVectorIndex(documents)
 
-response = index.query("What are the best places to roam the streets of New York?")
+question1 = input("Enter your first question: ")
+response = index.query(question1)
 print(response)
 
 print("----------------------------------")
 
-response = index.query("Who is the best mayor of New York in terms of econmic growth?")
+question2 = input("Enter your second question: ")
+response = index.query(question2)
 print(response)
 
 # save to disk
