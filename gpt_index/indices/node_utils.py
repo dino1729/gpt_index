@@ -1,6 +1,7 @@
 """General node utils."""
 
 
+import logging
 from typing import List
 
 from gpt_index.data_structs.data_structs import Node
@@ -24,8 +25,7 @@ def get_nodes_from_document(
     index_counter = 0
     for i, text_split in enumerate(text_chunks_with_overlap):
         text_chunk = text_split.text_chunk
-        fmt_text_chunk = truncate_text(text_chunk, 50)
-        print(f"> Adding chunk: {fmt_text_chunk}")
+        logging.debug(f"> Adding chunk: {truncate_text(text_chunk, 50)}")
         index_pos_info = {
             # NOTE: start is inclusive, end is exclusive
             "start": index_counter - text_split.num_char_overlap,

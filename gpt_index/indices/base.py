@@ -1,5 +1,6 @@
 """Base index classes."""
 import json
+import logging
 from abc import abstractmethod
 from typing import (
     Any,
@@ -49,8 +50,6 @@ class BaseGPTIndex(Generic[IS]):
             will use the default PromptHelper.
         chunk_size_limit (Optional[int]): Optional chunk size limit. If not provided,
             will use the default chunk size limit (4096 max input size).
-        verbose (bool): Optional bool. If True, will print out additional information
-            during the index building process.
         include_extra_info (bool): Optional bool. If True, extra info (i.e. metadata)
             of each Document will be prepended to its text to help with queries.
             Default is True.
@@ -69,7 +68,6 @@ class BaseGPTIndex(Generic[IS]):
         index_registry: Optional[IndexRegistry] = None,
         prompt_helper: Optional[PromptHelper] = None,
         chunk_size_limit: Optional[int] = None,
-        verbose: bool = False,
         include_extra_info: bool = True,
     ) -> None:
         """Initialize with parameters."""
@@ -105,9 +103,7 @@ class BaseGPTIndex(Generic[IS]):
             )
             self._validate_documents(documents)
             # TODO: introduce document store outside __init__ function
-            self._index_struct = self.build_index_from_documents(
-                documents, verbose=verbose
-            )
+            self._index_struct = self.build_index_from_documents(documents)
         # update index registry and docstore with index_struct
         self._update_index_registry_and_docstore()
 
@@ -264,17 +260,13 @@ class BaseGPTIndex(Generic[IS]):
         )
 
     @abstractmethod
-    def _build_index_from_documents(
-        self, documents: Sequence[BaseDocument], verbose: bool = False
-    ) -> IS:
+    def _build_index_from_documents(self, documents: Sequence[BaseDocument]) -> IS:
         """Build the index from documents."""
 
     @llm_token_counter("build_index_from_documents")
-    def build_index_from_documents(
-        self, documents: Sequence[BaseDocument], verbose: bool = False
-    ) -> IS:
+    def build_index_from_documents(self, documents: Sequence[BaseDocument]) -> IS:
         """Build the index from documents."""
-        return self._build_index_from_documents(documents, verbose=verbose)
+        return self._build_index_from_documents(documents)
 
     @abstractmethod
     def _insert(self, document: BaseDocument, **insert_kwargs: Any) -> None:
@@ -307,13 +299,10 @@ class BaseGPTIndex(Generic[IS]):
             doc_id (str): document id
             full_delete (bool): whether to delete the document from the docstore.
                 By default this is True.
-            verbose (bool): whether to print verbose output. By default this is False.
 
         """
-        verbose = delete_kwargs.pop("verbose", False)
         full_delete = delete_kwargs.pop("full_delete", True)
-        if verbose:
-            print(f"> Deleting document: {doc_id}")
+        logging.debug(f"> Deleting document: {doc_id}")
         if full_delete:
             self._docstore.delete_document(doc_id)
         self._delete(doc_id, **delete_kwargs)
@@ -346,7 +335,6 @@ class BaseGPTIndex(Generic[IS]):
     def query(
         self,
         query_str: str,
-        verbose: bool = False,
         mode: str = QueryMode.DEFAULT,
         **query_kwargs: Any,
     ) -> Response:
@@ -374,7 +362,6 @@ class BaseGPTIndex(Generic[IS]):
                 self._docstore,
                 self._index_registry,
                 query_configs=query_configs,
-                verbose=verbose,
                 recursive=True,
             )
             return query_runner.query(query_str, self._index_struct)
@@ -393,7 +380,6 @@ class BaseGPTIndex(Generic[IS]):
                 self._docstore,
                 self._index_registry,
                 query_configs=[query_config],
-                verbose=verbose,
                 recursive=False,
             )
             return query_runner.query(query_str, self._index_struct)
@@ -402,6 +388,35 @@ class BaseGPTIndex(Generic[IS]):
     @abstractmethod
     def get_query_map(cls) -> Dict[str, Type[BaseGPTIndexQuery]]:
         """Get query map."""
+
+    @classmethod
+    def load_from_string(cls, index_string: str, **kwargs: Any) -> "BaseGPTIndex":
+        """Load index from string (in JSON-format).
+
+        This method loads the index from a JSON string. The index data
+        structure itself is preserved completely. If the index is defined over
+        subindices, those subindices will also be preserved (and subindices of
+        those subindices, etc.).
+
+        NOTE: load_from_string should not be used for indices composed on top
+        of other indices. Please define a `ComposableGraph` and use
+        `save_to_string` and `load_from_string` on that instead.
+
+        Args:
+            index_string (str): The index string (in JSON-format).
+
+        Returns:
+            BaseGPTIndex: The loaded index.
+
+        """
+        result_dict = json.loads(index_string)
+        index_struct = cls.index_struct_cls.from_dict(result_dict["index_struct"])
+        type_to_struct = {index_struct.get_type(): type(index_struct)}
+        docstore = DocumentStore.load_from_dict(
+            result_dict["docstore"],
+            type_to_struct=type_to_struct,
+        )
+        return cls(index_struct=index_struct, docstore=docstore, **kwargs)
 
     @classmethod
     def load_from_disk(cls, save_path: str, **kwargs: Any) -> "BaseGPTIndex":
@@ -424,14 +439,35 @@ class BaseGPTIndex(Generic[IS]):
 
         """
         with open(save_path, "r") as f:
-            result_dict = json.load(f)
-            index_struct = cls.index_struct_cls.from_dict(result_dict["index_struct"])
-            type_to_struct = {index_struct.get_type(): type(index_struct)}
-            docstore = DocumentStore.load_from_dict(
-                result_dict["docstore"],
-                type_to_struct=type_to_struct,
+            file_contents = f.read()
+            return cls.load_from_string(file_contents, **kwargs)
+
+    def save_to_string(self, **save_kwargs: Any) -> str:
+        """Save to string.
+
+        This method stores the index into a JSON string.
+
+        NOTE: save_to_string should not be used for indices composed on top
+        of other indices. Please define a `ComposableGraph` and use
+        `save_to_string` and `load_from_string` on that instead.
+
+        Returns:
+            str: The JSON string of the index.
+
+        """
+        if self.docstore.contains_index_struct(
+            exclude_ids=[self.index_struct.get_doc_id()]
+        ):
+            raise ValueError(
+                "Cannot call `save_to_string` on index if index is composed on top of "
+                "other indices. Please define a `ComposableGraph` and use "
+                "`save_to_string` and `load_from_string` on that instead."
             )
-            return cls(index_struct=index_struct, docstore=docstore, **kwargs)
+        out_dict: Dict[str, dict] = {
+            "index_struct": self.index_struct.to_dict(),
+            "docstore": self.docstore.serialize_to_dict(),
+        }
+        return json.dumps(out_dict, **save_kwargs)
 
     def save_to_disk(self, save_path: str, **save_kwargs: Any) -> None:
         """Save to file.
@@ -446,17 +482,6 @@ class BaseGPTIndex(Generic[IS]):
             save_path (str): The save_path of the file.
 
         """
-        if self.docstore.contains_index_struct(
-            exclude_ids=[self.index_struct.get_doc_id()]
-        ):
-            raise ValueError(
-                "Cannot call `save_to_disk` on index if index is composed on top of "
-                "other indices. Please define a `ComposableGraph` and use "
-                "`save_to_disk` and `load_from_disk` on that instead."
-            )
-        out_dict: Dict[str, dict] = {
-            "index_struct": self.index_struct.to_dict(),
-            "docstore": self.docstore.serialize_to_dict(),
-        }
+        index_string = self.save_to_string(**save_kwargs)
         with open(save_path, "w") as f:
-            json.dump(out_dict, f)
+            f.write(index_string)
