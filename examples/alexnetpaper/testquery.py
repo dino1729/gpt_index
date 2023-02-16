@@ -1,10 +1,8 @@
 import os
-
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 
 from IPython.display import Markdown, display
-
 from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 
 documents = SimpleDirectoryReader("data").load_data()
