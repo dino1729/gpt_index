@@ -1,6 +1,8 @@
 import os
+
 from IPython.display import Markdown, display
 from pytube import YouTube
+
 from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 
 BUILD_MODE = True

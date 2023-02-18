@@ -1,10 +1,13 @@
 <!doctype html>
 <html>
   <head>
-    <title>Upload File and Ask Questions</title>
+    <title>Question Answerator</title>
   </head>
   <body>
-    <h1>Upload File</h1>
+
+    <h1>You've choice of either uploading files or provide a YouTube URL</h1>
+    <br><br>
+    <h1>Upload files here</h1>
     <form method="post" action="/upload" enctype="multipart/form-data">
       <input type="file" name="file">
       <br><br>
@@ -18,14 +21,22 @@
       if (messageText) {
         message.textContent = messageText;
       }
+      const fileInput = document.querySelector('input[type="file"]');
+      fileInput.addEventListener('change', (event) => {
+        const fileName = event.target.files[0].name;
+        message.textContent = `You are uploading ${fileName}`;
+      });
     </script>
     <br>
 
-    <h1>Analyze the data</h1>
-    <form method="post" action="/analyze">
-      <input type="submit" value="Analyze">
+    <h1>Provide YT URL here</h1>
+    <form method="post" action="/ytvideo">
+      <input type="text" name="yturl" size="100">
+      <br><br>
+      <input type="submit" value="Download">
     </form>
     <div id="message2"></div>
+    {{ video_name_display }}
     <script>
       const message2 = document.getElementById('message2');
       const urlParams2 = new URLSearchParams(window.location.search);
@@ -36,15 +47,37 @@
     </script>
     <br>
 
-    <h1>Ask your question</h1>
+    <h1>Analyze the data</h1>
+    <form method="post" action="/analyze">
+      <input type="submit" value="Analyze">
+    </form>
+    <div id="message3"></div>
+    <script>
+      const message3 = document.getElementById('message3');
+      const urlParams3 = new URLSearchParams(window.location.search);
+      const messageText3 = urlParams.get('msg3');
+      if (messageText3) {
+        message3.textContent = messageText3;
+      }
+    </script>
+    <br>
+
+    <h1>What is your question</h1>
     <form method="post" action="/ask">
       <input type="text" name="question" size="100">
       <br><br>
       <input type="submit" value="Ask">
     </form>
     <br>
-<!-- Display the answer in a message box -->
-    <h1>Answer</h1>
+
+<!-- Display the answer to the question in a message box; Display the question too! -->
+    <h1>GPT says... </h1>
+    <label>Question:</label>
+    <br>
+    <textarea rows="5" cols="100" readonly>{{request.form['question']}}</textarea>
+    <br>
+    <label>Answer:</label>
+    <br>
     <textarea rows="20" cols="100" readonly>
       {{answer}}
     </textarea>
