@@ -1,13 +1,61 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <title>Question Answerator</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        margin: 0;
+      }
+
+      header {
+        background-color: #4CAF50;
+        color: #fff;
+        padding: 20px;
+        text-align: center;
+      }
+
+      main {
+        margin: 20px;
+      }
+
+      form {
+        margin-bottom: 20px;
+      }
+
+      input[type="submit"] {
+        background-color: #4CAF50;
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        padding: 10px 20px;
+        text-decoration: none;
+      }
+
+      input[type="submit"]:hover {
+        background-color: #3e8e41;
+      }
+
+      textarea {
+        border: 1px solid #ccc;
+        padding: 10px;
+        resize: vertical;
+        width: 100%;
+      }
+    </style>
   </head>
   <body>
 
+    <header>
+      <h1>Question Answerator</h1>
+    </header>
+    <main>
+
     <h1>You've choice of either uploading files or provide a YouTube URL</h1>
-    <br><br>
-    <h1>Upload files here</h1>
+    <br>
+    <h2>Upload files here</h2>
     <form method="post" action="/upload" enctype="multipart/form-data">
       <input type="file" name="file">
       <br><br>
@@ -29,7 +77,7 @@
     </script>
     <br>
 
-    <h1>Provide YT URL here</h1>
+    <h2>Provide YT URL here</h2>
     <form method="post" action="/ytvideo">
       <input type="text" name="yturl" size="100">
       <br><br>
@@ -47,7 +95,7 @@
     </script>
     <br>
 
-    <h1>Analyze the data</h1>
+    <h2>Analyze the data</h2>
     <form method="post" action="/analyze">
       <input type="submit" value="Analyze">
     </form>
@@ -62,7 +110,7 @@
     </script>
     <br>
 
-    <h1>What is your question</h1>
+    <h2>What is your question</h2>
     <form method="post" action="/ask">
       <input type="text" name="question" size="100">
       <br><br>
@@ -71,14 +119,17 @@
     <br>
 
 <!-- Display the answer to the question in a message box; Display the question too! -->
-    <h1>GPT says... </h1>
+    <h2>GPT says... </h2>
     <label>Question:</label>
     <br>
-    <textarea rows="5" cols="100" readonly>{{request.form['question']}}</textarea>
+    <textarea rows="5" cols="60" readonly>{{request.form['question']}}</textarea>
     <br>
     <label>Answer:</label>
     <br>
-    <textarea rows="20" cols="100" readonly>
+    <textarea rows="20" cols="60" readonly>
       {{answer}}
     </textarea>
+
+    </main>
   </body>
+</html>
