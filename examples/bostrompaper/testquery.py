@@ -12,7 +12,7 @@ os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 
 # Either build or load the document index
 if BUILD_MODE:
-    # Put the paper you want to study into data folder in txt format
+    # Put the paper you want to study into data folder
     documents = SimpleDirectoryReader('data').load_data()
     index = GPTSimpleVectorIndex(documents)
     index.save_to_disk("bostrom_paper_index.json")

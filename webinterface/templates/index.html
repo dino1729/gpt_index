@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Upload File and Ask Questions</title>
+  </head>
+  <body>
+    <h1>Upload File</h1>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+      <input type="file" name="file">
+      <br><br>
+      <input type="submit" value="Upload">
+    </form>
+    <div id="message"></div>
+    <script>
+      const message = document.getElementById('message');
+      const urlParams = new URLSearchParams(window.location.search);
+      const messageText = urlParams.get('msg');
+      if (messageText) {
+        message.textContent = messageText;
+      }
+    </script>
+    <br>
+
+    <h1>Analyze the data</h1>
+    <form method="post" action="/analyze">
+      <input type="submit" value="Analyze">
+    </form>
+    <div id="message2"></div>
+    <script>
+      const message2 = document.getElementById('message2');
+      const urlParams2 = new URLSearchParams(window.location.search);
+      const messageText2 = urlParams.get('msg2');
+      if (messageText2) {
+        message2.textContent = messageText2;
+      }
+    </script>
+    <br>
+
+    <h1>Ask your question</h1>
+    <form method="post" action="/ask">
+      <input type="text" name="question" size="100">
+      <br><br>
+      <input type="submit" value="Ask">
+    </form>
+    <br>
+<!-- Display the answer in a message box -->
+    <h1>Answer</h1>
+    <textarea rows="20" cols="100" readonly>
+      {{answer}}
+    </textarea>
+  </body>
