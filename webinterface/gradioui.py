@@ -152,16 +152,19 @@ def download_ytvideo(url):
     else:
         return "Please enter a valid Youtube URL"
 
-def ask(question):
+def ask(question,history):
+    history = history or []
+    s = list(sum(history, ()))
+    s.append(question)
+    inp = ' '.join(s)
+
     index = GPTSimpleVectorIndex.load_from_disk(UPLOAD_FOLDER + "/index.json")
-    #response = index.query(question, mode = "embedding", similarity_top_k = 2)
     response = index.query(question)
     answer = response.response
 
-    #source1 = response.source_nodes[0].source_text
-    #source2 = response.source_nodes[1].source_text
+    history.append((question, answer))
 
-    return answer
+    return history, history
 
 def cleartext(query, output):
   """
@@ -169,40 +172,47 @@ def cleartext(query, output):
   """
   return ["", ""]
 
-with gr.Blocks() as demo:
+with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     gr.Markdown(
         """
-        <h1><center><b>GPT Answering Bot</center></h1>
+        <h1><center><b>LLM Magic Bot</center></h1>
         """
     )
     gr.Markdown(
         """
-        This app uses the GPT-3 API to answer questions about the content of a video or document.
+        This app uses the Transformer magic to answer questions about the content of a video or document. Either upload a document or enter a Youtube URL to get started.
         """
     )
     with gr.Row():
-        with gr.Column():
+        with gr.Column(scale=1, min_width=220):
             files = gr.File(label = "Upload your files here", file_count="multiple")
-            upload_output = gr.Textbox(label="Upload Status")
-            upload_button = gr.Button("Upload")
-            yturl = gr.Textbox(label="Enter Youtube URL")
-            download_button = gr.Button("Download")
-            download_output = gr.Textbox(label="Download Status")
-        with gr.Column():
-            query = gr.Textbox(label="Enter your question here")
-            submit_button = gr.Button("Submit")
-            ans_output = gr.Textbox(label="Answer")
-            #source1 = gr.Textbox(label="Source 1")
-            #source2 = gr.Textbox(label="Source 2")
-            clear_button = gr.Button("Clear")
+            with gr.Row():
+                upload_button = gr.Button("Upload").style(full_width=False)
+                upload_output = gr.Textbox(label="Upload Status")
+            yturl = gr.Textbox(placeholder="Input must be a URL", label="Enter Youtube URL")
+            with gr.Row():
+                download_button = gr.Button("Download").style(full_width=False)
+                download_output = gr.Textbox(label="Download Status")
+        with gr.Column(scale=2, min_width=680):
+            chatbot = gr.Chatbot(elem_id="chatbot", label="LLM Bot").style(color_map=["blue","grey"])
+            state = gr.State([])
+            with gr.Row():
+                #query = gr.Textbox(placeholder="Enter your question here", label="Question")
+                query = gr.Textbox(show_label=False, placeholder="Enter text and press enter").style(container=False)
+                submit_button = gr.Button("Ask").style(full_width=False)
+                clearquery_button = gr.Button("Clear").style(full_width=False)
+            submit_button.click(ask, inputs=[query, state], outputs=[chatbot, state])
+            query.submit(ask, inputs=[query, state], outputs=[chatbot, state])
+            clearchat_button = gr.Button("Clear Chat")
+
     # Upload button for uploading files
-    upload_button.click(upload_file, inputs=[files], outputs=[upload_output])
+    upload_button.click(upload_file, inputs=[files], outputs=[upload_output], show_progress=True)
     # Download button for downloading youtube video
-    download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output])
-    # Submit button for submitting the query
-    submit_button.click(ask, inputs=[query], outputs=[ans_output])
-    # Clear button for clearing the output
-    clear_button.click(cleartext, inputs=[query,ans_output], outputs=[query, ans_output])
+    download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output], show_progress=True)
+
+    clearquery_button.click(cleartext, inputs=[query,query], outputs=[query,query])
+    clearchat_button.click(cleartext, inputs=[query, chatbot], outputs=[query, chatbot])
+
     live = True
 
 if __name__ == '__main__':
