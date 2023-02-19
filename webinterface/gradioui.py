@@ -1,80 +1,207 @@
 import os
+from shutil import copyfileobj
 from urllib.parse import parse_qs, urlparse
 
 import gradio as gr
+import PyPDF2
 from IPython.display import Markdown, display
 from langchain import OpenAI
 from langchain.agents import initialize_agent
+from PIL import Image
 from pytube import YouTube
 
-from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
-
-BUILD_MODE = False
+from gpt_index import Document, GPTSimpleVectorIndex, SimpleDirectoryReader
 
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
-
 UPLOAD_FOLDER = './data' # set the upload folder path
-ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'mp4', 'avi', 'mkv', 'mov'} # set the allowed file extensions
 
 #If the UPLOAD_FOLDER path does not exist, create it
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
+def pdftotext(file_name):
+    """
+    Function to extract text from .pdf format files
+    """
+    text = []
+    # Open the PDF file in read-binary mode
+    with open(file_name, 'rb') as file:
+        # Create a PDF object
+        pdf = PyPDF2.PdfReader(file)
+        # Get the number of pages in the PDF document
+        num_pages = len(pdf.pages)
+        # Iterate over every page
+        for page in range(num_pages):
+            # Extract the text from the page
+            result = pdf.pages[page].extract_text()
+            text.append(result)
+    text = "\n".join(text)
+    return text
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+def preprocesstext(text):
+    """
+    Function to preprocess text
+    """
+    # Split the string into lines
+    lines = text.splitlines()
+    # Use a list comprehension to filter out empty lines
+    lines = [line for line in lines if line.strip()]
+    # Join the modified lines back into a single string
+    text = '\n'.join(lines)
+    return text
 
-def upload_file(file):
-    if file and allowed_file(file.name):
-        filename = file.name
-        file.save(os.path.join(UPLOAD_FOLDER, filename))
-        message = filename + ' uploaded successfully!!'
-        return message
-    else:
-        message = 'Allowed file types are pdf, png, jpg, jpeg, gif, mp4, avi, mkv, mov'
-        return message
+def processfiles(files):
+    """
+    Function to extract text from documents
+    """
+    textlist = []
+    # Iterate over provided files
+    for file in files:
+        # Get file name
+        file_name = file.name
+        # Get extention of file name
+        ext = file_name.split(".")[-1].lower()
+        text = ""
+        # Process document based on extention
+        if ext == "pdf":
+            text = pdftotext(file_name)
+        # Preprocess text
+        text = preprocesstext(text)
+        # Append the text to final result
+        textlist.append(text)
+    return textlist
 
+def fileformatvaliditycheck(files):
+    #Function to check validity of file formats
+    for file in files:
+        file_name = file.name
+        # Get extention of file name
+        ext = file_name.split(".")[-1].lower()
+        if ext not in ["pdf", "txt", "docx", "png", "jpg", "jpeg"]:
+            return False
+    return True
+
+def createdocumentlist(files):
+    documents = []
+    for file in files:
+        documents.append(Document(file))
+    return documents
+
+def savetodisk(files):
+    #Save the files to the UPLOAD_FOLDER
+    for file in files:
+        #Extract the file name
+        filename_with_path = file.name
+        file_name = file.name.split("/")[-1]
+        #Open the file in read-binary mode
+        with open(filename_with_path, 'rb') as f:
+            #Save the file to the UPLOAD_FOLDER
+            with open(UPLOAD_FOLDER + "/" + file_name, 'wb') as f1:
+                copyfileobj(f, f1)
+
+def build_index():
+    #doctextlist = processfiles(files)
+    #documents = createdocumentlist(doctextlist)
+    documents = SimpleDirectoryReader(UPLOAD_FOLDER).load_data()
+    #index = GPTSimpleVectorIndex(documents, chunk_size_limit=1000)
+    index = GPTSimpleVectorIndex(documents) 
+    #Save the index to UPLOAD_FOLDER
+    index.save_to_disk(UPLOAD_FOLDER + "/index.json")
+
+def clearnonfiles():
+    #Ensure the UPLOAD_FOLDER contains only the files uploaded
+    for file in os.listdir(UPLOAD_FOLDER):
+        if file not in [f.name.split("/")[-1] for f in files]:
+            os.remove(UPLOAD_FOLDER + "/" + file)
+
+def clearnonvideos():
+    #Ensure the UPLOAD_FOLDER contains only the video downloaded
+    for file in os.listdir(UPLOAD_FOLDER):
+        if file not in ["video.mp4"]:
+            os.remove(UPLOAD_FOLDER + "/" + file)
+
+def upload_file(files):
+    #Basic checks
+    if not files:
+        return "Please upload a file before proceeding"
+    
+    fileformatvalidity = fileformatvaliditycheck(files)
+    #Check if all the files are in the correct format
+    if not fileformatvalidity:
+        return "Please upload documents in pdf/txt/docx/png/jpg/jpeg format only."
+    
+    #Save files to UPLOAD_FOLDER
+    savetodisk(files)
+    #Clear files from UPLOAD_FOLDER
+    clearnonfiles()
+    #Build index
+    build_index()
+    return "Files uploaded and Index built successfully!"
 
 def download_ytvideo(url):
     #If there is a url in the input field, download the video
     if url:
         yt = YouTube(url)
-        query_params = parse_qs(urlparse(yt).query)
-        video_name = query_params['v'][0]
-        video_name_display = f'<h2>Video Name: {video_name}</h2>'
         yt.streams.filter(progressive=True, file_extension="mp4").order_by("resolution").desc().first().download(UPLOAD_FOLDER, filename="video.mp4")
-        message = 'Youtube video downloaded successfully!!'
-        return message, video_name_display
+        #Clear files from UPLOAD_FOLDER
+        clearnonvideos()
+        return "Youtube video downloaded and Index built successfully!"
     else:
-        message = 'Please enter a valid Youtube URL'
-        return message, ''
-
-def build_index():
-    documents = SimpleDirectoryReader(UPLOAD_FOLDER).load_data()
-    index = GPTSimpleVectorIndex(documents)
-    index.save_to_disk(os.path.join(UPLOAD_FOLDER, "index.json"))
-    message = 'Index built successfully! You can now ask questions!!'
-    return message
-
+        return "Please enter a valid Youtube URL"
 
 def ask(question):
-    index = GPTSimpleVectorIndex.load_from_disk(os.path.join(UPLOAD_FOLDER, "index.json"))
+    index = GPTSimpleVectorIndex.load_from_disk(UPLOAD_FOLDER + "/index.json")
+    #response = index.query(question, mode = "embedding", similarity_top_k = 2)
     response = index.query(question)
-    return response
+    answer = response.response
 
-# Set up Gradio interface
-file_uploader = gr.inputs.File(upload_folder=UPLOAD_FOLDER)
-text_input = gr.inputs.Textbox(lines=3, placeholder="Type your question here...")
-url_input = gr.inputs.Textbox(label="Youtube URL")
-output_text = gr.outputs.Textbox(label="Answer", default="No answer yet.")
-interface = gr.Interface(upload_file, [file_uploader], output_text, capture_session=True, title="File Uploader")
+    #source1 = response.source_nodes[0].source_text
+    #source2 = response.source_nodes[1].source_text
 
-interface2 = gr.Interface(download_ytvideo, [url_input], [output_text, gr.outputs.HTML(label="Video Name")], capture_session=True, title="Youtube Video Downloader")
+    return answer
 
-interface3 = gr.Interface(build_index, [], output_text, capture_session=True, title="Build Index")
+def cleartext(query, output):
+  """
+  Function to clear text
+  """
+  return ["", ""]
 
-interface4 = gr.Interface(ask, text_input, output_text, capture_session=True, title="Ask a Question")
+with gr.Blocks() as demo:
+    gr.Markdown(
+        """
+        <h1><center><b>GPT Answering Bot</center></h1>
+        """
+    )
+    gr.Markdown(
+        """
+        This app uses the GPT-3 API to answer questions about the content of a video or document.
+        """
+    )
+    with gr.Row():
+        with gr.Column():
+            files = gr.File(label = "Upload your files here", file_count="multiple")
+            upload_output = gr.Textbox(label="Upload Status")
+            upload_button = gr.Button("Upload")
+            yturl = gr.Textbox(label="Enter Youtube URL")
+            download_button = gr.Button("Download")
+            download_output = gr.Textbox(label="Download Status")
+        with gr.Column():
+            query = gr.Textbox(label="Enter your question here")
+            submit_button = gr.Button("Submit")
+            ans_output = gr.Textbox(label="Answer")
+            #source1 = gr.Textbox(label="Source 1")
+            #source2 = gr.Textbox(label="Source 2")
+            clear_button = gr.Button("Clear")
+    # Upload button for uploading files
+    upload_button.click(upload_file, inputs=[files], outputs=[upload_output])
+    # Download button for downloading youtube video
+    download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output])
+    # Submit button for submitting the query
+    submit_button.click(ask, inputs=[query], outputs=[ans_output])
+    # Clear button for clearing the output
+    clear_button.click(cleartext, inputs=[query,ans_output], outputs=[query, ans_output])
+    live = True
 
-# Launch the app
-gr.Interface([interface, interface2, interface3, interface4], gradio_server_name="my-gradio-app").launch()
+if __name__ == '__main__':
+    demo.launch()
