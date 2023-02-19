@@ -109,10 +109,10 @@ def build_index():
     #Save the index to UPLOAD_FOLDER
     index.save_to_disk(UPLOAD_FOLDER + "/index.json")
 
-def clearnonfiles():
+def clearnonfiles(files):
     #Ensure the UPLOAD_FOLDER contains only the files uploaded
     for file in os.listdir(UPLOAD_FOLDER):
-        if file not in [f.name.split("/")[-1] for f in files]:
+        if file not in [file.name.split("/")[-1] for file in files]:
             os.remove(UPLOAD_FOLDER + "/" + file)
 
 def clearnonvideos():
@@ -134,7 +134,7 @@ def upload_file(files):
     #Save files to UPLOAD_FOLDER
     savetodisk(files)
     #Clear files from UPLOAD_FOLDER
-    clearnonfiles()
+    clearnonfiles(files)
     #Build index
     build_index()
     return "Files uploaded and Index built successfully!"
@@ -146,6 +146,8 @@ def download_ytvideo(url):
         yt.streams.filter(progressive=True, file_extension="mp4").order_by("resolution").desc().first().download(UPLOAD_FOLDER, filename="video.mp4")
         #Clear files from UPLOAD_FOLDER
         clearnonvideos()
+        #Build index
+        build_index()
         return "Youtube video downloaded and Index built successfully!"
     else:
         return "Please enter a valid Youtube URL"
