@@ -246,18 +246,20 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     with gr.Row():
         with gr.Column(scale=1, min_width=250):
             with gr.Box():
-                files = gr.File(label = "Upload your files here", file_count="multiple")
+                files = gr.File(label = "Upload the files to be analyzed", file_count="multiple")
                 with gr.Row():
                     upload_button = gr.Button("Upload").style(full_width=False)
                     upload_output = gr.Textbox(label="Upload Status")
             with gr.Tab(label="Video Analyzer"):
                 yturl = gr.Textbox(placeholder="Input must be a URL", label="Enter Youtube URL")
-                download_button = gr.Button("Download").style(full_width=False)
-                download_output = gr.Textbox(label="Download Status")
+                with gr.Row():
+                    download_button = gr.Button("Download").style(full_width=False)
+                    download_output = gr.Textbox(label="Video download Status")
             with gr.Tab(label="Article Analyzer"):
                 arturl = gr.Textbox(placeholder="Input must be a URL", label="Enter Article URL")
-                adownload_button = gr.Button("Download").style(full_width=False)
-                adownload_output = gr.Textbox(label="Download Status")
+                with gr.Row():
+                    adownload_button = gr.Button("Download").style(full_width=False)
+                    adownload_output = gr.Textbox(label="Article download Status")
         with gr.Column(scale=2, min_width=650):
             with gr.Box():
                 chatbot = gr.Chatbot(elem_id="chatbot", label="LLM Bot").style(color_map=["blue","grey"])
