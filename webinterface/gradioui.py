@@ -4,11 +4,17 @@ from urllib.parse import parse_qs, urlparse
 
 import gradio as gr
 import PyPDF2
+import requests
+from bs4 import BeautifulSoup
 from IPython.display import Markdown, display
 from langchain import OpenAI
 from langchain.agents import initialize_agent
+from newspaper import Article
 from PIL import Image
 from pytube import YouTube
+from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.chrome.options import Options
 
 from gpt_index import Document, GPTSimpleVectorIndex, SimpleDirectoryReader
 
@@ -121,6 +127,12 @@ def clearnonvideos():
         if file not in ["video.mp4"]:
             os.remove(UPLOAD_FOLDER + "/" + file)
 
+def clearnonarticles():
+    #Ensure the UPLOAD_FOLDER contains only the article downloaded
+    for file in os.listdir(UPLOAD_FOLDER):
+        if file not in ["article.txt"]:
+            os.remove(UPLOAD_FOLDER + "/" + file)
+
 def upload_file(files):
     #Basic checks
     if not files:
@@ -151,6 +163,54 @@ def download_ytvideo(url):
         return "Youtube video downloaded and Index built successfully!"
     else:
         return "Please enter a valid Youtube URL"
+
+def download_art(url):
+    #If there is a url in the input field, download the article
+    if url:
+        #Extract the article
+        article = Article(url)
+        article.download()
+        article.parse()
+        #Save the article to the UPLOAD_FOLDER
+        with open(UPLOAD_FOLDER + "/article.txt", 'w') as f:
+            f.write(article.text)
+        #Clear files from UPLOAD_FOLDER
+        clearnonarticles()
+        #Build index
+        build_index()
+        return "Article downloaded and Index built successfully!"
+    else:
+        return "Please enter a valid URL"
+
+# def download_art(url):
+#     if url:
+#         # Set up Selenium
+#         options = Options()
+#         options.add_argument("--headless") # Run in headless mode to avoid opening a visible browser window
+#         driver = webdriver.Chrome(options=options)
+#         driver.implicitly_wait(10)
+#         # Navigate to the URL
+#         driver.get(url)
+#         try:
+#             # Find the element containing the article content
+#             article_element = driver.find_element_by_class_name("article-content")
+#             # Extract the text content
+#             article_text = article_element.text
+#             # Save the article to the UPLOAD_FOLDER
+#             with open(UPLOAD_FOLDER + "/article.txt", 'w') as f:
+#                 f.write(article_text)
+#             # Clear files from UPLOAD_FOLDER
+#             clearnonarticles()
+#             # Build index
+#             build_index()
+#             return "Article downloaded and index built successfully!"
+#         except NoSuchElementException:
+#             return "Unable to extract article content from the URL provided"
+#         finally:
+#             # Close the browser window
+#             driver.quit()
+#     else:
+#         return "Please enter a valid URL"
 
 def ask(question,history):
     history = history or []
@@ -184,31 +244,38 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
         """
     )
     with gr.Row():
-        with gr.Column(scale=1, min_width=220):
-            files = gr.File(label = "Upload your files here", file_count="multiple")
-            with gr.Row():
-                upload_button = gr.Button("Upload").style(full_width=False)
-                upload_output = gr.Textbox(label="Upload Status")
-            yturl = gr.Textbox(placeholder="Input must be a URL", label="Enter Youtube URL")
-            with gr.Row():
+        with gr.Column(scale=1, min_width=250):
+            with gr.Box():
+                files = gr.File(label = "Upload your files here", file_count="multiple")
+                with gr.Row():
+                    upload_button = gr.Button("Upload").style(full_width=False)
+                    upload_output = gr.Textbox(label="Upload Status")
+            with gr.Tab(label="Video Analyzer"):
+                yturl = gr.Textbox(placeholder="Input must be a URL", label="Enter Youtube URL")
                 download_button = gr.Button("Download").style(full_width=False)
                 download_output = gr.Textbox(label="Download Status")
-        with gr.Column(scale=2, min_width=680):
-            chatbot = gr.Chatbot(elem_id="chatbot", label="LLM Bot").style(color_map=["blue","grey"])
-            state = gr.State([])
-            with gr.Row():
-                #query = gr.Textbox(placeholder="Enter your question here", label="Question")
-                query = gr.Textbox(show_label=False, placeholder="Enter text and press enter").style(container=False)
-                submit_button = gr.Button("Ask").style(full_width=False)
-                clearquery_button = gr.Button("Clear").style(full_width=False)
-            submit_button.click(ask, inputs=[query, state], outputs=[chatbot, state])
-            query.submit(ask, inputs=[query, state], outputs=[chatbot, state])
+            with gr.Tab(label="Article Analyzer"):
+                arturl = gr.Textbox(placeholder="Input must be a URL", label="Enter Article URL")
+                adownload_button = gr.Button("Download").style(full_width=False)
+                adownload_output = gr.Textbox(label="Download Status")
+        with gr.Column(scale=2, min_width=650):
+            with gr.Box():
+                chatbot = gr.Chatbot(elem_id="chatbot", label="LLM Bot").style(color_map=["blue","grey"])
+                state = gr.State([])
+                with gr.Row():
+                    query = gr.Textbox(show_label=False, placeholder="Enter text and press enter").style(container=False)
+                    submit_button = gr.Button("Ask").style(full_width=False)
+                    clearquery_button = gr.Button("Clear").style(full_width=False)
+                submit_button.click(ask, inputs=[query, state], outputs=[chatbot, state])
+                query.submit(ask, inputs=[query, state], outputs=[chatbot, state])
             clearchat_button = gr.Button("Clear Chat")
 
     # Upload button for uploading files
     upload_button.click(upload_file, inputs=[files], outputs=[upload_output], show_progress=True)
     # Download button for downloading youtube video
     download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output], show_progress=True)
+    # Download button for downloading article
+    adownload_button.click(download_art, inputs=[arturl], outputs=[adownload_output], show_progress=True)
 
     clearquery_button.click(cleartext, inputs=[query,query], outputs=[query,query])
     clearchat_button.click(cleartext, inputs=[query, chatbot], outputs=[query, chatbot])
@@ -216,4 +283,4 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     live = True
 
 if __name__ == '__main__':
-    demo.launch()
+    demo.launch(server_name='0.0.0.0',server_port=7860)

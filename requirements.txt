@@ -1,5 +1,6 @@
 -e .
 
+#for i in $(cat requirements.txt); do pip install $i; done
 # For testing
 pytest==7.2.1
 pytest-dotenv==0.5.2
@@ -21,6 +22,11 @@ flake8-docstrings==1.6.0
 pylint==2.15.10
 
 git+https://github.com/openai/whisper.git
+newspaper3k
+requests
+selenium
+beautifulsoup4
+ffmpeg-python
 PyPDF2
 gradio
 IPython
