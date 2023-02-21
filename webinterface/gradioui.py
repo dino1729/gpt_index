@@ -1,4 +1,5 @@
 import os
+import json
 from shutil import copyfileobj
 from urllib.parse import parse_qs, urlparse
 
@@ -12,15 +13,15 @@ from langchain.agents import initialize_agent
 from newspaper import Article
 from PIL import Image
 from pytube import YouTube
-from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.chrome.options import Options
 
 from gpt_index import Document, GPTSimpleVectorIndex, SimpleDirectoryReader
 
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 UPLOAD_FOLDER = './data' # set the upload folder path
+example_queries= ["Generate key 10 point summary", "What are 5 main ideas of this article?", "What are the key lessons learned and messages in this video?", "List key insights and lessons learned from the paper","What are the key takeaways from this article?"]
+
+print(example_queries)
 
 #If the UPLOAD_FOLDER path does not exist, create it
 if not os.path.exists(UPLOAD_FOLDER):
@@ -107,13 +108,11 @@ def savetodisk(files):
                 copyfileobj(f, f1)
 
 def build_index():
-    #doctextlist = processfiles(files)
-    #documents = createdocumentlist(doctextlist)
+
     documents = SimpleDirectoryReader(UPLOAD_FOLDER).load_data()
-    #index = GPTSimpleVectorIndex(documents, chunk_size_limit=1000)
     index = GPTSimpleVectorIndex(documents) 
-    #Save the index to UPLOAD_FOLDER
     index.save_to_disk(UPLOAD_FOLDER + "/index.json")
+
 
 def clearnonfiles(files):
     #Ensure the UPLOAD_FOLDER contains only the files uploaded
@@ -134,6 +133,8 @@ def clearnonarticles():
             os.remove(UPLOAD_FOLDER + "/" + file)
 
 def upload_file(files):
+
+    global example_queries, predictive_engine
     #Basic checks
     if not files:
         return "Please upload a file before proceeding"
@@ -149,9 +150,16 @@ def upload_file(files):
     clearnonfiles(files)
     #Build index
     build_index()
+    #Generate example queries
+    example_queries = example_generator()
+
+    print(example_queries)
+    predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
     return "Files uploaded and Index built successfully!"
 
 def download_ytvideo(url):
+
+    global example_queries, predictive_engine
     #If there is a url in the input field, download the video
     if url:
         yt = YouTube(url)
@@ -160,11 +168,17 @@ def download_ytvideo(url):
         clearnonvideos()
         #Build index
         build_index()
+        #Generate example queries
+        example_queries = example_generator()
+        predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
+
         return "Youtube video downloaded and Index built successfully!"
     else:
         return "Please enter a valid Youtube URL"
 
 def download_art(url):
+
+    global example_queries, predictive_engine
     #If there is a url in the input field, download the article
     if url:
         #Extract the article
@@ -178,39 +192,13 @@ def download_art(url):
         clearnonarticles()
         #Build index
         build_index()
+        #Generate example queries
+        example_queries = example_generator()
+        predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
+
         return "Article downloaded and Index built successfully!"
     else:
         return "Please enter a valid URL"
-
-# def download_art(url):
-#     if url:
-#         # Set up Selenium
-#         options = Options()
-#         options.add_argument("--headless") # Run in headless mode to avoid opening a visible browser window
-#         driver = webdriver.Chrome(options=options)
-#         driver.implicitly_wait(10)
-#         # Navigate to the URL
-#         driver.get(url)
-#         try:
-#             # Find the element containing the article content
-#             article_element = driver.find_element_by_class_name("article-content")
-#             # Extract the text content
-#             article_text = article_element.text
-#             # Save the article to the UPLOAD_FOLDER
-#             with open(UPLOAD_FOLDER + "/article.txt", 'w') as f:
-#                 f.write(article_text)
-#             # Clear files from UPLOAD_FOLDER
-#             clearnonarticles()
-#             # Build index
-#             build_index()
-#             return "Article downloaded and index built successfully!"
-#         except NoSuchElementException:
-#             return "Unable to extract article content from the URL provided"
-#         finally:
-#             # Close the browser window
-#             driver.quit()
-#     else:
-#         return "Please enter a valid URL"
 
 def ask(question,history):
     history = history or []
@@ -226,11 +214,25 @@ def ask(question,history):
 
     return history, history
 
+def ask_query(question):
+
+    index = GPTSimpleVectorIndex.load_from_disk(UPLOAD_FOLDER + "/index.json")
+    response = index.query(question)
+    answer = response.response
+
+    return answer
+
 def cleartext(query, output):
-  """
-  Function to clear text
-  """
+  #Function to clear text
   return ["", ""]
+
+def example_generator():
+    example_qs = []
+    try:
+        example_qs = eval(ask_query("Generate the top 5 relevant questions from the input text. Output must be must in the form of python list of 5 strings.").replace('\n', ''))
+    except:
+        example_qs = example_queries
+    return example_qs
 
 with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     gr.Markdown(
@@ -268,8 +270,12 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
                     query = gr.Textbox(show_label=False, placeholder="Enter text and press enter").style(container=False)
                     submit_button = gr.Button("Ask").style(full_width=False)
                     clearquery_button = gr.Button("Clear").style(full_width=False)
+                predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
+                #predictive_engine = gr.Textbox(label="Example Queries", value=example_queries)
                 submit_button.click(ask, inputs=[query, state], outputs=[chatbot, state])
+                #submit_button.click(cleartext, inputs=[query,query], outputs=[query,query])
                 query.submit(ask, inputs=[query, state], outputs=[chatbot, state])
+                #query.submit(cleartext, inputs=[query,query], outputs=[query,query])
             clearchat_button = gr.Button("Clear Chat")
 
     # Upload button for uploading files
@@ -280,9 +286,9 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     adownload_button.click(download_art, inputs=[arturl], outputs=[adownload_output], show_progress=True)
 
     clearquery_button.click(cleartext, inputs=[query,query], outputs=[query,query])
-    clearchat_button.click(cleartext, inputs=[query, chatbot], outputs=[query, chatbot])
+    clearchat_button.click(cleartext, inputs=[query,chatbot], outputs=[query,chatbot])
 
     live = True
 
 if __name__ == '__main__':
-    demo.launch(server_name='0.0.0.0',server_port=7860)
+    demo.launch(server_name='0.0.0.0',server_port=7860,debug=True)
