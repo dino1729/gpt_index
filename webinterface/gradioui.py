@@ -19,9 +19,8 @@ from gpt_index import Document, GPTSimpleVectorIndex, SimpleDirectoryReader
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 UPLOAD_FOLDER = './data' # set the upload folder path
-example_queries= ["Generate key 10 point summary", "What are 5 main ideas of this article?", "What are the key lessons learned and messages in this video?", "List key insights and lessons learned from the paper","What are the key takeaways from this article?"]
-
-print(example_queries)
+#example_queries= ["Generate key 10 point summary", "What are 5 main ideas of this article?", "What are the key lessons learned and insights in this video?", "List key insights and lessons learned from the paper","What are the key takeaways from this article?"]
+example_queries = [["Generate key 5 point summary"], ["What are 5 main ideas of this article?"], ["What are the key lessons learned and insights in this video?"], ["List key insights and lessons learned from the paper"], ["What are the key takeaways from this article?"]]
 
 #If the UPLOAD_FOLDER path does not exist, create it
 if not os.path.exists(UPLOAD_FOLDER):
@@ -134,15 +133,15 @@ def clearnonarticles():
 
 def upload_file(files):
 
-    global example_queries, predictive_engine
+    global example_queries
     #Basic checks
     if not files:
-        return "Please upload a file before proceeding"
+        return "Please upload a file before proceeding",gr.Dataset.update(samples=example_queries)
     
     fileformatvalidity = fileformatvaliditycheck(files)
     #Check if all the files are in the correct format
     if not fileformatvalidity:
-        return "Please upload documents in pdf/txt/docx/png/jpg/jpeg format only."
+        return "Please upload documents in pdf/txt/docx/png/jpg/jpeg format only.",gr.Dataset.update(samples=example_queries)
     
     #Save files to UPLOAD_FOLDER
     savetodisk(files)
@@ -153,13 +152,11 @@ def upload_file(files):
     #Generate example queries
     example_queries = example_generator()
 
-    print(example_queries)
-    predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
-    return "Files uploaded and Index built successfully!"
+    return "Files uploaded and Index built successfully!",gr.Dataset.update(samples=example_queries)
 
 def download_ytvideo(url):
 
-    global example_queries, predictive_engine
+    global example_queries
     #If there is a url in the input field, download the video
     if url:
         yt = YouTube(url)
@@ -170,15 +167,14 @@ def download_ytvideo(url):
         build_index()
         #Generate example queries
         example_queries = example_generator()
-        predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
 
-        return "Youtube video downloaded and Index built successfully!"
+        return "Youtube video downloaded and Index built successfully!",gr.Dataset.update(samples=example_queries)
     else:
-        return "Please enter a valid Youtube URL"
+        return "Please enter a valid Youtube URL",gr.Dataset.update(samples=example_queries)
 
 def download_art(url):
 
-    global example_queries, predictive_engine
+    global example_queries
     #If there is a url in the input field, download the article
     if url:
         #Extract the article
@@ -194,11 +190,10 @@ def download_art(url):
         build_index()
         #Generate example queries
         example_queries = example_generator()
-        predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
 
-        return "Article downloaded and Index built successfully!"
+        return "Article downloaded and Index built successfully!",gr.Dataset.update(samples=example_queries)
     else:
-        return "Please enter a valid URL"
+        return "Please enter a valid URL",gr.Dataset.update(samples=example_queries)
 
 def ask(question,history):
     history = history or []
@@ -229,10 +224,19 @@ def cleartext(query, output):
 def example_generator():
     example_qs = []
     try:
-        example_qs = eval(ask_query("Generate the top 5 relevant questions from the input text. Output must be must in the form of python list of 5 strings.").replace('\n', ''))
+        example_qs = [[item] for item in eval(ask_query("Generate the top 5 relevant questions from the input paragraph. Output must be must in the form of python list of 5 strings.").replace('\n', ''))]
     except:
         example_qs = example_queries
     return example_qs
+
+def update_examples():
+    global example_queries
+    example_queries = example_generator()
+    return gr.Dataset.update(samples=example_queries)
+
+def load_example(example_id):
+    global example_queries
+    return example_queries[example_id][0]
 
 with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     gr.Markdown(
@@ -270,8 +274,8 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
                     query = gr.Textbox(show_label=False, placeholder="Enter text and press enter").style(container=False)
                     submit_button = gr.Button("Ask").style(full_width=False)
                     clearquery_button = gr.Button("Clear").style(full_width=False)
-                predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
-                #predictive_engine = gr.Textbox(label="Example Queries", value=example_queries)
+                #predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
+                examples = gr.Dataset(samples=example_queries, components=[query], type="index")
                 submit_button.click(ask, inputs=[query, state], outputs=[chatbot, state])
                 #submit_button.click(cleartext, inputs=[query,query], outputs=[query,query])
                 query.submit(ask, inputs=[query, state], outputs=[chatbot, state])
@@ -279,11 +283,16 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
             clearchat_button = gr.Button("Clear Chat")
 
     # Upload button for uploading files
-    upload_button.click(upload_file, inputs=[files], outputs=[upload_output], show_progress=True)
+    #upload_button.click(upload_file, inputs=[files], outputs=[upload_output], show_progress=True)
+    upload_button.click(upload_file, inputs=[files], outputs=[upload_output,examples], show_progress=True)
+    #upload_button.click(update_examples, inputs=None, outputs=[examples])
     # Download button for downloading youtube video
-    download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output], show_progress=True)
+    download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output,examples], show_progress=True)
     # Download button for downloading article
-    adownload_button.click(download_art, inputs=[arturl], outputs=[adownload_output], show_progress=True)
+    adownload_button.click(download_art, inputs=[arturl], outputs=[adownload_output,examples], show_progress=True)
+
+    #Load example queries
+    examples.click(load_example, inputs=[examples], outputs=[query])
 
     clearquery_button.click(cleartext, inputs=[query,query], outputs=[query,query])
     clearchat_button.click(cleartext, inputs=[query,chatbot], outputs=[query,chatbot])
