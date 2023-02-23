@@ -19,7 +19,6 @@ from gpt_index import Document, GPTSimpleVectorIndex, SimpleDirectoryReader
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 UPLOAD_FOLDER = './data' # set the upload folder path
-#example_queries= ["Generate key 10 point summary", "What are 5 main ideas of this article?", "What are the key lessons learned and insights in this video?", "List key insights and lessons learned from the paper","What are the key takeaways from this article?"]
 example_queries = [["Generate key 5 point summary"], ["What are 5 main ideas of this article?"], ["What are the key lessons learned and insights in this video?"], ["List key insights and lessons learned from the paper"], ["What are the key takeaways from this article?"]]
 
 #If the UPLOAD_FOLDER path does not exist, create it
@@ -222,9 +221,10 @@ def cleartext(query, output):
   return ["", ""]
 
 def example_generator():
+    global example_queries
     example_qs = []
     try:
-        example_qs = [[item] for item in eval(ask_query("Generate the top 5 relevant questions from the input paragraph. Output must be must in the form of python list of 5 strings.").replace('\n', ''))]
+        example_qs = [[str(item)] for item in eval(ask_query("Generate the top 5 relevant questions from the input paragraph. Output must be must in the form of python list of 5 strings.").replace('\n', ''))]
     except:
         example_qs = example_queries
     return example_qs
@@ -241,12 +241,12 @@ def load_example(example_id):
 with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     gr.Markdown(
         """
-        <h1><center><b>LLM Magic Bot</center></h1>
+        <h1><center><b>LLM Dino Bot</center></h1>
         """
     )
     gr.Markdown(
         """
-        This app uses the Transformer magic to answer questions about the content of a video or document. Either upload a document or enter a Youtube URL to get started.
+        This app uses the Transformer magic to answer questions about the content of a video, article or document. Either upload a document or enter a Youtube/Article URL to get started.
         """
     )
     with gr.Row():
@@ -274,18 +274,13 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
                     query = gr.Textbox(show_label=False, placeholder="Enter text and press enter").style(container=False)
                     submit_button = gr.Button("Ask").style(full_width=False)
                     clearquery_button = gr.Button("Clear").style(full_width=False)
-                #predictive_engine = gr.Examples(label="Example Queries", inputs=query, examples=example_queries)
                 examples = gr.Dataset(samples=example_queries, components=[query], type="index")
                 submit_button.click(ask, inputs=[query, state], outputs=[chatbot, state])
-                #submit_button.click(cleartext, inputs=[query,query], outputs=[query,query])
                 query.submit(ask, inputs=[query, state], outputs=[chatbot, state])
-                #query.submit(cleartext, inputs=[query,query], outputs=[query,query])
             clearchat_button = gr.Button("Clear Chat")
 
     # Upload button for uploading files
-    #upload_button.click(upload_file, inputs=[files], outputs=[upload_output], show_progress=True)
     upload_button.click(upload_file, inputs=[files], outputs=[upload_output,examples], show_progress=True)
-    #upload_button.click(update_examples, inputs=None, outputs=[examples])
     # Download button for downloading youtube video
     download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output,examples], show_progress=True)
     # Download button for downloading article
