@@ -22,6 +22,7 @@ flake8-docstrings==1.6.0
 pylint==2.15.10
 
 git+https://github.com/openai/whisper.git
+pyparsing
 newspaper3k
 requests
 selenium

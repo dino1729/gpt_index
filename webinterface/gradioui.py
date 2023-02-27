@@ -1,5 +1,5 @@
-import os
 import json
+import os
 from shutil import copyfileobj
 from urllib.parse import parse_qs, urlparse
 
@@ -20,6 +20,7 @@ from gpt_index import Document, GPTSimpleVectorIndex, SimpleDirectoryReader
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 UPLOAD_FOLDER = './data' # set the upload folder path
 example_queries = [["Generate key 5 point summary"], ["What are 5 main ideas of this article?"], ["What are the key lessons learned and insights in this video?"], ["List key insights and lessons learned from the paper"], ["What are the key takeaways from this article?"]]
+example_qs = []
 
 #If the UPLOAD_FOLDER path does not exist, create it
 if not os.path.exists(UPLOAD_FOLDER):
@@ -221,8 +222,7 @@ def cleartext(query, output):
   return ["", ""]
 
 def example_generator():
-    global example_queries
-    example_qs = []
+    global example_queries, example_qs
     try:
         example_qs = [[str(item)] for item in eval(ask_query("Generate the top 5 relevant questions from the input paragraph. Output must be must in the form of python list of 5 strings.").replace('\n', ''))]
     except:
