@@ -133,15 +133,15 @@ def clearnonarticles():
 
 def upload_file(files):
 
-    global example_queries
+    global example_queries, summary, example_prompt
     #Basic checks
     if not files:
-        return "Please upload a file before proceeding",gr.Dataset.update(samples=example_queries)
+        return "Please upload a file before proceeding",gr.Dataset.update(samples=example_queries),summary
     
     fileformatvalidity = fileformatvaliditycheck(files)
     #Check if all the files are in the correct format
     if not fileformatvalidity:
-        return "Please upload documents in pdf/txt/docx/png/jpg/jpeg format only.",gr.Dataset.update(samples=example_queries)
+        return "Please upload documents in pdf/txt/docx/png/jpg/jpeg format only.",gr.Dataset.update(samples=example_queries),summary
     
     #Save files to UPLOAD_FOLDER
     savetodisk(files)
@@ -151,12 +151,14 @@ def upload_file(files):
     build_index()
     #Generate example queries
     example_queries = example_generator()
+    #Generate summary
+    summary = summary_generator()
 
-    return "Files uploaded and Index built successfully!",gr.Dataset.update(samples=example_queries)
+    return "Files uploaded and Index built successfully!",gr.Dataset.update(samples=example_queries),summary
 
 def download_ytvideo(url):
 
-    global example_queries
+    global example_queries,summary
     #If there is a url in the input field, download the video
     if url:
         yt = YouTube(url)
@@ -167,14 +169,16 @@ def download_ytvideo(url):
         build_index()
         #Generate example queries
         example_queries = example_generator()
+        #Generate summary
+        summary = summary_generator()
 
-        return "Youtube video downloaded and Index built successfully!",gr.Dataset.update(samples=example_queries)
+        return "Youtube video downloaded and Index built successfully!",gr.Dataset.update(samples=example_queries),summary
     else:
-        return "Please enter a valid Youtube URL",gr.Dataset.update(samples=example_queries)
+        return "Please enter a valid Youtube URL",gr.Dataset.update(samples=example_queries),summary
 
 def download_art(url):
 
-    global example_queries
+    global example_queries,summary
     #If there is a url in the input field, download the article
     if url:
         #Extract the article
@@ -190,10 +194,12 @@ def download_art(url):
         build_index()
         #Generate example queries
         example_queries = example_generator()
+        #Generate summary
+        summary = summary_generator()
 
-        return "Article downloaded and Index built successfully!",gr.Dataset.update(samples=example_queries)
+        return "Article downloaded and Index built successfully!",gr.Dataset.update(samples=example_queries),summary
     else:
-        return "Please enter a valid URL",gr.Dataset.update(samples=example_queries)
+        return "Please enter a valid URL",gr.Dataset.update(samples=example_queries),summary
 
 def ask(question,history):
     history = history or []
@@ -210,7 +216,6 @@ def ask(question,history):
     return history, history
 
 def ask_query(question):
-
     index = GPTSimpleVectorIndex.load_from_disk(UPLOAD_FOLDER + "/index.json")
     response = index.query(question)
     answer = response.response
@@ -224,10 +229,18 @@ def cleartext(query, output):
 def example_generator():
     global example_queries, example_qs
     try:
-        example_qs = [[str(item)] for item in eval(ask_query("Generate the top 5 relevant questions from the input paragraph. Output must be must in the form of python list of 5 strings.").replace('\n', ''))]
+        example_qs = [[str(item)] for item in eval(ask_query("Generate the top 5 relevant questions from the input context. The questions should be general and applicable to a variety of topics and sources. Output must be must in the form of python list of 5 strings.").replace('\n', ''))]
     except:
         example_qs = example_queries
     return example_qs
+
+def summary_generator():
+    global summary
+    try:
+        summary = ask_query("Generate a short summary from the input context. The summary should include all the key points discussed").replace('\n', '')
+    except:
+        summary = "Summary not available"
+    return summary
 
 def update_examples():
     global example_queries
@@ -241,7 +254,7 @@ def load_example(example_id):
 with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     gr.Markdown(
         """
-        <h1><center><b>LLM Dino Bot</center></h1>
+        <h1><center><b>chatPDF/chatVideo/chatArticle</center></h1>
         """
     )
     gr.Markdown(
@@ -268,6 +281,7 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
                     adownload_output = gr.Textbox(label="Article download Status")
         with gr.Column(scale=2, min_width=650):
             with gr.Box():
+                summary_output = gr.Textbox(placeholder="Summary will be generated here", label="Key takeaways")
                 chatbot = gr.Chatbot(elem_id="chatbot", label="LLM Bot").style(color_map=["blue","grey"])
                 state = gr.State([])
                 with gr.Row():
@@ -280,11 +294,11 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
             clearchat_button = gr.Button("Clear Chat")
 
     # Upload button for uploading files
-    upload_button.click(upload_file, inputs=[files], outputs=[upload_output,examples], show_progress=True)
+    upload_button.click(upload_file, inputs=[files], outputs=[upload_output,examples,summary_output], show_progress=True)
     # Download button for downloading youtube video
-    download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output,examples], show_progress=True)
+    download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output,examples,summary_output], show_progress=True)
     # Download button for downloading article
-    adownload_button.click(download_art, inputs=[arturl], outputs=[adownload_output,examples], show_progress=True)
+    adownload_button.click(download_art, inputs=[arturl], outputs=[adownload_output,examples,summary_output], show_progress=True)
 
     #Load example queries
     examples.click(load_example, inputs=[examples], outputs=[query])
