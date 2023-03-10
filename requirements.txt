@@ -29,6 +29,7 @@ selenium
 beautifulsoup4
 ffmpeg-python
 PyPDF2
+tiktoken
 gradio
 IPython
 pydub
