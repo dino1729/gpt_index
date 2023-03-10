@@ -1,23 +1,27 @@
 """Test list index."""
 
+import asyncio
+from copy import deepcopy
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Tuple, cast
 from unittest.mock import patch
 
 import pytest
 
 from gpt_index.data_structs.data_structs import Node
 from gpt_index.indices.list.base import GPTListIndex
-from gpt_index.indices.prompt_helper import PromptHelper
 from gpt_index.indices.query.list.embedding_query import GPTListIndexEmbeddingQuery
 from gpt_index.langchain_helpers.chain_wrapper import LLMPredictor
 from gpt_index.langchain_helpers.text_splitter import TokenTextSplitter
-from gpt_index.prompts.base import Prompt
 from gpt_index.readers.schema.base import Document
+from gpt_index.schema import BaseDocument
 from gpt_index.utils import globals_helper
 from tests.mock_utils.mock_decorator import patch_common
-from tests.mock_utils.mock_predict import mock_llmpredictor_predict
+from tests.mock_utils.mock_predict import (
+    mock_llmpredictor_apredict,
+    mock_llmpredictor_predict,
+)
 from tests.mock_utils.mock_prompts import MOCK_REFINE_PROMPT, MOCK_TEXT_QA_PROMPT
 
 
@@ -64,6 +68,45 @@ def test_build_list(
     assert list_index.index_struct.nodes[1].text == "This is a test."
     assert list_index.index_struct.nodes[2].text == "This is another test."
     assert list_index.index_struct.nodes[3].text == "This is a test v2."
+
+
+@patch_common
+def test_refresh_list(
+    _mock_init: Any,
+    _mock_predict: Any,
+    _mock_total_tokens_used: Any,
+    _mock_split_text_overlap: Any,
+    _mock_split_text: Any,
+    documents: List[BaseDocument],
+) -> None:
+    """Test build list."""
+    # add extra document
+    more_documents = documents + [Document("Test document 2")]
+
+    # ensure documents have doc_id
+    for i in range(len(more_documents)):
+        more_documents[i].doc_id = str(i)
+
+    # create index
+    list_index = GPTListIndex(documents=more_documents)
+
+    # check that no documents are refreshed
+    refreshed_docs = list_index.refresh(more_documents)
+    assert refreshed_docs[0] is False
+    assert refreshed_docs[1] is False
+
+    # modify a document and test again
+    more_documents = documents + [Document("Test document 2, now with changes!")]
+    for i in range(len(more_documents)):
+        more_documents[i].doc_id = str(i)
+
+    # second document should refresh
+    refreshed_docs = list_index.refresh(more_documents)
+    assert refreshed_docs[0] is False
+    assert refreshed_docs[1] is True
+    assert (
+        list_index.index_struct.nodes[-1].text == "Test document 2, now with changes!"
+    )
 
 
 @patch_common
@@ -216,44 +259,32 @@ def test_index_overlap(
         )
     ]
 
-    def _mock_text_splitter_with_space(
-        prompt: Prompt, num_chunks: int, padding: Optional[int] = 1
-    ) -> TokenTextSplitter:
-        """Mock text splitter."""
-        return TokenTextSplitter(
-            separator=" ",
-            chunk_size=30,
-            chunk_overlap=10,
-            tokenizer=globals_helper.tokenizer,
-        )
+    # A text splitter for test purposes
+    _text_splitter = TokenTextSplitter(
+        separator=" ",
+        chunk_size=30,
+        chunk_overlap=10,
+        tokenizer=globals_helper.tokenizer,
+    )
 
-    with patch.object(
-        PromptHelper,
-        "get_text_splitter_given_prompt",
-        side_effect=_mock_text_splitter_with_space,
-    ):
-        index = GPTListIndex(documents, **index_kwargs)
+    index = GPTListIndex(documents, text_splitter=_text_splitter, **index_kwargs)
 
-        query_str = "What is?"
-        response = index.query(query_str, mode="default", **query_kwargs)
-        node_info_0 = (
-            response.source_nodes[0].node_info
-            if response.source_nodes[0].node_info
-            else {}
-        )
-        # First chunk: 'Hello world. This is a test 1. This is a test 2.
-        # This is a test 3. This is a test 4. This is a'
-        assert node_info_0["start"] == 0  # start at the start
-        assert node_info_0["end"] == 94  # Length of first chunk.
+    query_str = "What is?"
+    response = index.query(query_str, mode="default", **query_kwargs)
+    node_info_0 = (
+        response.source_nodes[0].node_info if response.source_nodes[0].node_info else {}
+    )
+    # First chunk: 'Hello world. This is a test 1. This is a test 2.
+    # This is a test 3. This is a test 4. This is a'
+    assert node_info_0["start"] == 0  # start at the start
+    assert node_info_0["end"] == 94  # Length of first chunk.
 
-        node_info_1 = (
-            response.source_nodes[1].node_info
-            if response.source_nodes[1].node_info
-            else {}
-        )
-        # Second chunk: 'This is a test 4. This is a test 5.\n'
-        assert node_info_1["start"] == 67  # Position of second chunk relative to start
-        assert node_info_1["end"] == 103  # End index
+    node_info_1 = (
+        response.source_nodes[1].node_info if response.source_nodes[1].node_info else {}
+    )
+    # Second chunk: 'This is a test 4. This is a test 5.\n'
+    assert node_info_1["start"] == 67  # Position of second chunk relative to start
+    assert node_info_1["end"] == 103  # End index
 
 
 @patch_common
@@ -380,3 +411,44 @@ def test_to_from_string(
     assert new_list_index.index_struct.nodes[1].text == "This is a test."
     assert new_list_index.index_struct.nodes[2].text == "This is another test."
     assert new_list_index.index_struct.nodes[3].text == "This is a test v2."
+
+
+@patch_common
+@patch.object(LLMPredictor, "apredict", side_effect=mock_llmpredictor_apredict)
+def test_async_query(
+    _mock_async_predict: Any,
+    _mock_init: Any,
+    _mock_predict: Any,
+    _mock_total_tokens_used: Any,
+    _mock_split_text_overlap: Any,
+    _mock_split_text: Any,
+    documents: List[Document],
+    struct_kwargs: Dict,
+) -> None:
+    """Test list async query."""
+    index_kwargs, query_kwargs = struct_kwargs
+    index = GPTListIndex(documents, **index_kwargs)
+
+    # test default query mode.
+    query_str = "What is?"
+    task = index.aquery(query_str, mode="default", **query_kwargs)
+    response = asyncio.run(task)
+    assert str(response) == ("What is?:Hello world.")
+    node_info = (
+        response.source_nodes[0].node_info if response.source_nodes[0].node_info else {}
+    )
+    assert node_info["start"] == 0
+    assert node_info["end"] == 12
+
+    # test tree_summarize mode
+    query_str = "What is?"
+    query_kwargs_copy = deepcopy(query_kwargs)
+    query_kwargs_copy["response_mode"] = "tree_summarize"
+    task = index.aquery(query_str, mode="default", **query_kwargs_copy)
+    response = asyncio.run(task)
+    assert str(response) == ("What is?:Hello world.")
+    node_info = (
+        response.source_nodes[0].node_info if response.source_nodes[0].node_info else {}
+    )
+    assert node_info["start"] == 0
+    assert node_info["end"] == 12

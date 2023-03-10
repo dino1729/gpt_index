@@ -1,7 +1,7 @@
 # Data Connectors (LlamaHub 🦙)
 
 Our data connectors are offered through [LlamaHub](https://llamahub.ai/) 🦙. 
-LlamaHub is an open-source repository containing data loaders that you can easily plug and play into any GPT Index application.
+LlamaHub is an open-source repository containing data loaders that you can easily plug and play into any LlamaIndex application.
 
 ![](/_static/data_connectors/llamahub.png)
 
@@ -20,7 +20,7 @@ downloads the loader file into a module that you can use within your application
 Example usage:
 
 ```python
-from gpt_index import GPTSimpleVectorIndex, download_loader
+from llama_index import GPTSimpleVectorIndex, download_loader
 
 GoogleDocsReader = download_loader('GoogleDocsReader')
 

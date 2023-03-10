@@ -8,6 +8,7 @@ from gpt_index.prompts.prompts import (
     RefinePrompt,
     RefineTableContextPrompt,
     SchemaExtractPrompt,
+    SimpleInputPrompt,
     SummaryPrompt,
     TableContextPrompt,
     TextToSQLPrompt,
@@ -88,7 +89,7 @@ DEFAULT_QUERY_PROMPT_MULTIPLE = TreeSelectMultiplePrompt(
 DEFAULT_REFINE_PROMPT_TMPL = (
     "The original question is as follows: {query_str}\n"
     "We have provided an existing answer: {existing_answer}\n"
-    "We have the opportunity to refine the existing answer"
+    "We have the opportunity to refine the existing answer "
     "(only if needed) with some more context below.\n"
     "------------\n"
     "{context_msg}\n"
@@ -258,6 +259,10 @@ DEFAULT_KG_TRIPLET_EXTRACT_PROMPT = KnowledgeGraphPrompt(
     DEFAULT_KG_TRIPLET_EXTRACT_TMPL
 )
 
+############################################
+# HYDE
+##############################################
+
 HYDE_TMPL = (
     "Please write a passage to answer the question\n"
     "Try to include as many key details as possible.\n"
@@ -270,3 +275,11 @@ HYDE_TMPL = (
 )
 
 DEFAULT_HYDE_PROMPT = SummaryPrompt(HYDE_TMPL)
+
+
+############################################
+# Simple Input
+############################################
+
+DEFAULT_SIMPLE_INPUT_TMPL = "{query_str}"
+DEFAULT_SIMPLE_INPUT_PROMPT = SimpleInputPrompt(DEFAULT_SIMPLE_INPUT_TMPL)

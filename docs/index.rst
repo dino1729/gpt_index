@@ -3,18 +3,21 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to GPT Index (LlamaIndex 🦙)!
+Welcome to LlamaIndex 🦙 (GPT Index)!
 =====================================
 
-GPT Index (LlamaIndex) is a project consisting of a set of data structures designed to make it easier to 
-use large external knowledge bases with LLMs.
+LlamaIndex (GPT Index) is a project that provides a central interface to connect your LLM's with external data.
 
    ⚠️ **NOTE**: We are rebranding GPT Index as LlamaIndex! We will carry out this transition gradually.
 
-   **2/27/2022**: We have a duplicate `llama-index` pip package. Simply replace all imports of `gpt_index` with `llama_index` if you choose to `pip install llama-index`.
+   **2/19/2023**: By default, our docs/notebooks/instructions now use the `llama-index` package. However the `gpt-index` package still exists as a duplicate!
+
+   **2/16/2023**: We have a duplicate `llama-index` pip package. Simply replace all imports of `gpt_index` with `llama_index` if you choose to `pip install llama-index`.
 
 - Github: https://github.com/jerryjliu/gpt_index
-- PyPi: https://pypi.org/project/gpt-index/
+- PyPi:
+   - LlamaIndex: https://pypi.org/project/llama-index/.
+   - GPT Index (duplicate): https://pypi.org/project/gpt-index/.
 - Twitter: https://twitter.com/gpt_index
 - Discord https://discord.gg/dGcwcsnxhU
 
@@ -24,23 +27,27 @@ use large external knowledge bases with LLMs.
 
 Context
 ^^^^^^^
-- LLMs are a phenomenonal piece of technology for knowledge generation and reasoning.
-- A big limitation of LLMs is context size (e.g. Davinci's limit is 4096 tokens. Large, but not infinite).
-- The ability to feed "knowledge" to LLMs is restricted to this limited prompt size and model weights.
+- LLMs are a phenomenonal piece of technology for knowledge generation and reasoning. They are pre-trained on large amounts of publicly available data.
+- How do we best augment LLMs with our own private data?
+- One paradigm that has emerged is *in-context* learning (the other is finetuning), where we insert context into the input prompt. That way, we take advantage of the LLM's reasoning capabilities to generate a response.
+
+To perform LLM's data augmentation in a performant, efficient, and cheap manner, we need to solve two components:
+
+- Data Ingestion
+- Data Indexing
 
 Proposed Solution
 ^^^^^^^^^^^^^^^^^
-That's where the **GPT Index** comes in. GPT Index is a simple, flexible interface between your external data and LLMs. It resolves the following pain points:
+That's where the **LlamaIndex** comes in. LlamaIndex is a simple, flexible interface between your external data and LLMs. It provides the following tools in an easy-to-use fashion:
 
-- Provides simple data structures to resolve prompt size limitations.
-- Offers data connectors to your external data sources.
+- Offers `data connectors <http://llamahub.ai>`_ to your existing data sources and data formats (API's, PDF's, docs, SQL, etc.)
+- Provides **indices** over your unstructured and structured data for use with LLM's. These indices help to abstract away common boilerplate and pain points for in-context learning:
+
+   - Storing context in an easy-to-access format for prompt insertion.
+   - Dealing with prompt limitations (e.g. 4096 tokens for Davinci) when context is too big.
+   - Dealing with text splitting.
+- Provides users an interface to **query** the index (feed in an input prompt) and obtain a knowledge-augmented output.
 - Offers you a comprehensive toolset trading off cost and performance.
-
-At the core of GPT Index is a **data structure**. Instead of relying on world knowledge encoded in the model weights, a GPT Index data structure does the following:
-
-- Uses a pre-trained LLM primarily for *reasoning*/*summarization* instead of prior knowledge.
-- Takes as input a large corpus of text data and build a structured index over it (using an LLM or heuristics).
-- Allow users to *query* the index by passing in an LLM prompt, and obtaining a response.
 
 
 .. toctree::
@@ -59,6 +66,7 @@ At the core of GPT Index is a **data structure**. Instead of relying on world kn
    guides/usage_pattern.md
    guides/use_cases.md
    guides/index_guide.md
+   guides/sql_guide.md
 
 
 .. toctree::
@@ -90,7 +98,9 @@ At the core of GPT Index is a **data structure**. Instead of relying on world kn
    reference/embeddings.rst
    reference/struct_store.rst
    reference/response.rst
+   reference/playground.rst
    reference/example_notebooks.rst
+   reference/langchain_integrations/base.rst
 
 
 .. toctree::

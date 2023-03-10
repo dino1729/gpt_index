@@ -1,15 +1,19 @@
-# 🗂️ ️GPT Index (LlamaIndex 🦙)
+# 🗂️ LlamaIndex 🦙 (GPT Index)
 
 > ⚠️ **NOTE**: We are rebranding GPT Index as LlamaIndex! We will carry out this transition gradually.
 
-> **2/27/2022**: We have a duplicate `llama-index` pip package. Simply replace all imports of `gpt_index` with `llama_index` if you choose to `pip install llama-index`.
+> **2/25/2023**: By default, our docs/notebooks/instructions now reference "LlamaIndex"
+instead of "GPT Index".
 
-GPT Index (LlamaIndex) is a project consisting of a set of data structures designed to make it easier to 
-use large external knowledge bases with LLMs.
+> **2/19/2023**: By default, our docs/notebooks/instructions now use the `llama-index` package. However the `gpt-index` package still exists as a duplicate!
+
+> **2/16/2023**: We have a duplicate `llama-index` pip package. Simply replace all imports of `gpt_index` with `llama_index` if you choose to `pip install llama-index`.
+
+LlamaIndex (GPT Index) is a project that provides a central interface to connect your LLM's with external data.
 
 PyPi: 
-- GPT Index: https://pypi.org/project/gpt-index/.
-- LlamaIndex (duplicate): https://pypi.org/project/llama-index/.
+- LlamaIndex: https://pypi.org/project/llama-index/.
+- GPT Index (duplicate): https://pypi.org/project/gpt-index/.
 
 Documentation: https://gpt-index.readthedocs.io/en/latest/.
 
@@ -23,27 +27,28 @@ LlamaHub (community library of data loaders): https://llamahub.ai
 
 **NOTE**: This README is not updated as frequently as the documentation. Please check out the documentation above for the latest updates!
 
-#### Context
-- LLMs are a phenomenonal piece of technology for knowledge generation and reasoning.
-- A big limitation of LLMs is context size (e.g. Davinci's limit is 4096 tokens. Large, but not infinite).
-- The ability to feed "knowledge" to LLMs is restricted to this limited prompt size and model weights.
+### Context
+- LLMs are a phenomenonal piece of technology for knowledge generation and reasoning. They are pre-trained on large amounts of publicly available data.
+- How do we best augment LLMs with our own private data?
+- One paradigm that has emerged is *in-context* learning (the other is finetuning), where we insert context into the input prompt. That way,
+we take advantage of the LLM's reasoning capabilities to generate a response.
 
-#### Proposed Solution
+To perform LLM's data augmentation in a performant, efficient, and cheap manner, we need to solve two components:
+- Data Ingestion
+- Data Indexing
 
-At its core, GPT Index contains a toolkit of **index data structures** designed to easily connect LLM's with your external data.
-GPT Index helps to provide the following advantages:
-- Remove concerns over prompt size limitations.
-- Abstract common usage patterns to reduce boilerplate code in your LLM app.
-- Provide data connectors to your common data sources (Google Docs, Slack, etc.).
-- Provide cost transparency + tools that reduce cost while increasing performance.
+### Proposed Solution
 
+That's where the **LlamaIndex** comes in. LlamaIndex is a simple, flexible interface between your external data and LLMs. It provides the following tools in an easy-to-use fashion:
 
-Each data structure offers distinct use cases and a variety of customizable parameters. These indices can then be 
-*queried* in a general purpose manner, in order to achieve any task that you would typically achieve with an LLM:
-- Question-Answering
-- Summarization
-- Text Generation (Stories, TODO's, emails, etc.)
-- and more!
+- Offers **data connectors** to your existing data sources and data formats (API's, PDF's, docs, SQL, etc.)
+- Provides **indices** over your unstructured and structured data for use with LLM's. 
+These indices help to abstract away common boilerplate and pain points for in-context learning:
+   - Storing context in an easy-to-access format for prompt insertion.
+   - Dealing with prompt limitations (e.g. 4096 tokens for Davinci) when context is too big.
+   - Dealing with text splitting.
+- Provides users an interface to **query** the index (feed in an input prompt) and obtain a knowledge-augmented output.
+- Offers you a comprehensive toolset trading off cost and performance.
 
 
 ## 💡 Contributing
@@ -60,7 +65,7 @@ Please check it out for the most up-to-date tutorials, how-to guides, references
 ## 💻 Example Usage
 
 ```
-pip install gpt-index
+pip install llama-index
 ```
 
 Examples are in the `examples` folder. Indices are in the `indices` folder (see list of indices below).
@@ -70,7 +75,7 @@ To build a simple vector store index:
 import os
 os.environ["OPENAI_API_KEY"] = 'YOUR_OPENAI_API_KEY'
 
-from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
+from llama_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 documents = SimpleDirectoryReader('data').load_data()
 index = GPTSimpleVectorIndex(documents)
 ```
@@ -97,14 +102,15 @@ All requirements should be contained within the `setup.py` file. To run the pack
 
 ## 📖 Citation
 
-Reference to cite if you use GPT Index in a paper:
+Reference to cite if you use LlamaIndex in a paper:
 
 ```
-@software{Liu_GPT_Index_2022,
+@software{Liu_LlamaIndex_2022,
 author = {Liu, Jerry},
 doi = {10.5281/zenodo.1234},
 month = {11},
-title = {{GPT Index}},
-url = {https://github.com/jerryjliu/gpt_index},year = {2022}
+title = {{LlamaIndex}},
+url = {https://github.com/jerryjliu/gpt_index},
+year = {2022}
 }
 ```

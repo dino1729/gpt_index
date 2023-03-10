@@ -9,8 +9,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Callable, Generator, List, Optional, Set, Type, cast
 
-import nltk
-
 
 class GlobalsHelper:
     """Helper to retrieve globals.
@@ -36,11 +34,17 @@ class GlobalsHelper:
                 try:
                     import tiktoken
                 except ImportError:
-                    raise ValueError(tiktoken_import_err)
+                    raise ImportError(tiktoken_import_err)
                 enc = tiktoken.get_encoding("gpt2")
                 self._tokenizer = cast(Callable[[str], List], enc.encode)
             else:
-                import transformers
+                try:
+                    import transformers
+                except ImportError:
+                    raise ImportError(
+                        "`transformers` package not found, "
+                        "please run `pip install transformers`"
+                    )
 
                 tokenizer = transformers.GPT2TokenizerFast.from_pretrained("gpt2")
 
@@ -55,9 +59,10 @@ class GlobalsHelper:
         """Get stopwords."""
         if self._stopwords is None:
             try:
+                import nltk
                 from nltk.corpus import stopwords
             except ImportError:
-                raise ValueError(
+                raise ImportError(
                     "`nltk` package not found, please run `pip install nltk`"
                 )
             nltk.download("stopwords")
@@ -165,3 +170,8 @@ def retry_on_exceptions_with_backoff(
                 raise
             time.sleep(backoff_secs)
             backoff_secs = min(backoff_secs * 2, max_backoff_secs)
+
+
+def truncate_text(text: str, max_length: int) -> str:
+    """Truncate text to a maximum length."""
+    return text[: max_length - 3] + "..."

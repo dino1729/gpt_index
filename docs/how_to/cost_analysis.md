@@ -10,7 +10,7 @@ Each call to an LLM will cost some amount of money - for instance, OpenAI's Davi
 The cost of building and querying each index is a TODO in the reference documentation. In the meantime, we provide the following information:
 
 1. A high-level overview of the cost structure of the indices.
-2. A token predictor that you can use directly within GPT Index!
+2. A token predictor that you can use directly within LlamaIndex!
 
 ### Overview of Cost Structure
 
@@ -44,7 +44,7 @@ Here are some notes regarding each of the indices:
 
 ### Token Predictor Usage
 
-GPT Index offers token **predictors** to predict token usage of LLM and embedding calls.
+LlamaIndex offers token **predictors** to predict token usage of LLM and embedding calls.
 This allows you to estimate your costs during 1) index construction, and 2) index querying, before
 any respective LLM calls are made.
 
@@ -52,7 +52,7 @@ any respective LLM calls are made.
 
 To predict token usage of LLM calls, import and instantiate the MockLLMPredictor with the following:
 ```python
-from gpt_index import MockLLMPredictor
+from llama_index import MockLLMPredictor
 
 llm_predictor = MockLLMPredictor(max_tokens=256)
 ```
@@ -61,7 +61,7 @@ You can then use this predictor during both index construction and querying. Exa
 
 **Index Construction**
 ```python
-from gpt_index import GPTTreeIndex, MockLLMPredictor, SimpleDirectoryReader
+from llama_index import GPTTreeIndex, MockLLMPredictor, SimpleDirectoryReader
 
 documents = SimpleDirectoryReader('../paul_graham_essay/data').load_data()
 # the "mock" llm predictor is our token counter
@@ -88,7 +88,7 @@ You may also predict the token usage of embedding calls with `MockEmbedding`.
 You can use it in tandem with `MockLLMPredictor`.
 
 ```python
-from gpt_index import (
+from llama_index import (
     GPTSimpleVectorIndex, 
     MockLLMPredictor, 
     MockEmbedding, 

@@ -1,6 +1,6 @@
-# GPT Index Usage Pattern
+# LlamaIndex Usage Pattern
 
-The general usage pattern of GPT Index is as follows:
+The general usage pattern of LlamaIndex is as follows:
 1. Load in documents (either manually, or through a data loader).
 2. Index Construction.
 3. [Optional, Advanced] Building indices on top of other indices
@@ -13,16 +13,16 @@ We provide a variety of [data loaders](/how_to/data_connectors.md) which will lo
 through the `load_data` function, e.g.:
 
 ```python
-from gpt_index import SimpleDirectoryReader
+from llama_index import SimpleDirectoryReader
 
 documents = SimpleDirectoryReader('data').load_data()
 
 ```
 
-You can also choose to construct documents manually. GPT Index exposes the `Document` struct.
+You can also choose to construct documents manually. LlamaIndex exposes the `Document` struct.
 
 ```python
-from gpt_index import Document
+from llama_index import Document
 
 text_list = [text1, text2, ...]
 documents = [Document(t) for t in text_list]
@@ -33,13 +33,13 @@ documents = [Document(t) for t in text_list]
 We can now build an index over these Document objects. The simplest is to load in the Document objects during index initialization.
 
 ```python
-from gpt_index import GPTSimpleVectorIndex
+from llama_index import GPTSimpleVectorIndex
 
 index = GPTSimpleVectorIndex(documents)
 
 ```
 
-Depending on which index you use, GPT Index may make LLM calls in order to build the index.
+Depending on which index you use, LlamaIndex may make LLM calls in order to build the index.
 
 ### Inserting Documents
 
@@ -47,7 +47,7 @@ You can also take advantage of the `insert` capability of indices to insert Docu
 one at a time instead of during index construction. 
 
 ```python
-from gpt_index import GPTSimpleVectorIndex
+from llama_index import GPTSimpleVectorIndex
 
 index = GPTSimpleVectorIndex([])
 for doc in documents:
@@ -63,7 +63,7 @@ By default, we use OpenAI's `text-davinci-003` model. You may choose to use anot
 an index.
 
 ```python
-from gpt_index import LLMPredictor, GPTSimpleVectorIndex, PromptHelper
+from llama_index import LLMPredictor, GPTSimpleVectorIndex, PromptHelper
 
 ...
 
@@ -124,14 +124,14 @@ index = GPTSimpleVectorIndex.load_from_disk('index.json')
 You can build indices on top of other indices! 
 
 ```python
-from gpt_index import GPTSimpleVectorIndex, GPTListIndex
+from llama_index import GPTSimpleVectorIndex, GPTListIndex
 
 index1 = GPTSimpleVectorIndex(documents1)
 index2 = GPTSimpleVectorIndex(documents2)
 
 # Set summary text
 # you can set the summary manually, or you can
-# generate the summary itself using GPT Index
+# generate the summary itself using LlamaIndex
 index1.set_text("summary1")
 index2.set_text("summary2")
 

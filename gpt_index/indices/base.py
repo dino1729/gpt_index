@@ -27,7 +27,7 @@ from gpt_index.indices.query.query_transform import BaseQueryTransform
 from gpt_index.indices.query.schema import QueryBundle, QueryConfig, QueryMode
 from gpt_index.indices.registry import IndexRegistry
 from gpt_index.langchain_helpers.chain_wrapper import LLMPredictor
-from gpt_index.langchain_helpers.text_splitter import TokenTextSplitter
+from gpt_index.langchain_helpers.text_splitter import TextSplitter, TokenTextSplitter
 from gpt_index.readers.schema.base import Document
 from gpt_index.response.schema import Response
 from gpt_index.schema import BaseDocument
@@ -40,7 +40,7 @@ DOCUMENTS_INPUT = Union[BaseDocument, "BaseGPTIndex"]
 
 
 class BaseGPTIndex(Generic[IS]):
-    """Base GPT Index.
+    """Base LlamaIndex.
 
     Args:
         documents (Optional[Sequence[BaseDocument]]): List of documents to
@@ -68,6 +68,7 @@ class BaseGPTIndex(Generic[IS]):
         docstore: Optional[DocumentStore] = None,
         index_registry: Optional[IndexRegistry] = None,
         prompt_helper: Optional[PromptHelper] = None,
+        text_splitter: Optional[TextSplitter] = None,
         chunk_size_limit: Optional[int] = None,
         include_extra_info: bool = True,
     ) -> None:
@@ -86,6 +87,7 @@ class BaseGPTIndex(Generic[IS]):
         self._prompt_helper = prompt_helper or PromptHelper.from_llm_predictor(
             self._llm_predictor, chunk_size_limit=chunk_size_limit
         )
+        self._text_splitter = text_splitter or self._build_fallback_text_splitter()
 
         # build index struct in the init function
         self._docstore = docstore or DocumentStore()
@@ -174,6 +176,7 @@ class BaseGPTIndex(Generic[IS]):
                     )
                 results.append(sub_index_struct)
             elif isinstance(doc, Document):
+                docstore.set_document_hash(doc.get_doc_id(), doc.get_doc_hash())
                 results.append(doc)
             else:
                 raise ValueError(f"Invalid document type: {type(doc)}.")
@@ -253,15 +256,18 @@ class BaseGPTIndex(Generic[IS]):
     def _get_nodes_from_document(
         self,
         document: BaseDocument,
-        text_splitter: TokenTextSplitter,
         start_idx: int = 0,
     ) -> List[Node]:
         return get_nodes_from_document(
             document=document,
-            text_splitter=text_splitter,
+            text_splitter=self._text_splitter,
             start_idx=start_idx,
             include_extra_info=self._include_extra_info,
         )
+
+    def _build_fallback_text_splitter(self) -> TextSplitter:
+        """Build the text splitter if not specified in args."""
+        return TokenTextSplitter()
 
     @abstractmethod
     def _build_index_from_documents(self, documents: Sequence[BaseDocument]) -> IS:
@@ -319,6 +325,27 @@ class BaseGPTIndex(Generic[IS]):
         """
         self.delete(document.get_doc_id(), **update_kwargs.pop("delete_kwargs", {}))
         self.insert(document, **update_kwargs.pop("insert_kwargs", {}))
+
+    def refresh(
+        self, documents: List[BaseDocument], **update_kwargs: Any
+    ) -> List[bool]:
+        """Refresh an index with documents that have changed.
+
+        This allows users to save LLM and Embedding model calls, while only
+        updating documents that have any changes in text or extra_info. It
+        will also insert any documents that previously were not stored.
+        """
+        refreshed_documents = [False] * len(documents)
+        for i, document in enumerate(documents):
+            existing_doc_hash = self._docstore.get_document_hash(document.get_doc_id())
+            if existing_doc_hash != document.get_doc_hash():
+                self.update(document, **update_kwargs)
+                refreshed_documents[i] = True
+            elif existing_doc_hash is None:
+                self.insert(document, **update_kwargs.pop("insert_kwargs", {}))
+                refreshed_documents[i] = True
+
+        return refreshed_documents
 
     def _preprocess_query(self, mode: QueryMode, query_kwargs: Dict) -> None:
         """Preprocess query.
@@ -389,10 +416,103 @@ class BaseGPTIndex(Generic[IS]):
             )
             return query_runner.query(query_str, self._index_struct)
 
+    async def aquery(
+        self,
+        query_str: Union[str, QueryBundle],
+        mode: str = QueryMode.DEFAULT,
+        query_transform: Optional[BaseQueryTransform] = None,
+        **query_kwargs: Any,
+    ) -> Response:
+        """Asynchronously answer a query.
+
+        When `query` is called, we query the index with the given `mode` and
+        `query_kwargs`. The `mode` determines the type of query to run, and
+        `query_kwargs` are parameters that are specific to the query type.
+
+        For a comprehensive documentation of available `mode` and `query_kwargs` to
+        query a given index, please visit :ref:`Ref-Query`.
+
+
+        """
+        # TODO: currently we don't have async versions of all
+        # underlying functions. Setting use_async=True
+        # will cause async nesting errors because we assume
+        # it's called in a synchronous setting.
+        use_async = False
+
+        mode_enum = QueryMode(mode)
+        if mode_enum == QueryMode.RECURSIVE:
+            # TODO: deprecated, use ComposableGraph instead.
+            if "query_configs" not in query_kwargs:
+                raise ValueError("query_configs must be provided for recursive mode.")
+            query_configs = query_kwargs["query_configs"]
+            query_runner = QueryRunner(
+                self._llm_predictor,
+                self._prompt_helper,
+                self._embed_model,
+                self._docstore,
+                self._index_registry,
+                query_configs=query_configs,
+                query_transform=query_transform,
+                recursive=True,
+                use_async=use_async,
+            )
+            return await query_runner.aquery(query_str, self._index_struct)
+        else:
+            self._preprocess_query(mode_enum, query_kwargs)
+            # TODO: pass in query config directly
+            query_config = QueryConfig(
+                index_struct_type=self._index_struct.get_type(),
+                query_mode=mode_enum,
+                query_kwargs=query_kwargs,
+            )
+            query_runner = QueryRunner(
+                self._llm_predictor,
+                self._prompt_helper,
+                self._embed_model,
+                self._docstore,
+                self._index_registry,
+                query_configs=[query_config],
+                query_transform=query_transform,
+                recursive=False,
+                use_async=use_async,
+            )
+            return await query_runner.aquery(query_str, self._index_struct)
+
     @classmethod
     @abstractmethod
     def get_query_map(cls) -> Dict[str, Type[BaseGPTIndexQuery]]:
         """Get query map."""
+
+    @classmethod
+    def load_from_dict(
+        cls, result_dict: Dict[str, Any], **kwargs: Any
+    ) -> "BaseGPTIndex":
+        """Load index from dict."""
+        if "index_struct" in result_dict:
+            index_struct = cls.index_struct_cls.from_dict(result_dict["index_struct"])
+            index_struct_id = index_struct.get_doc_id()
+        elif "index_struct_id" in result_dict:
+            index_struct_id = result_dict["index_struct_id"]
+        else:
+            raise ValueError("index_struct or index_struct_id must be provided.")
+
+        type_to_struct = {cls.index_struct_cls.get_type(): cls.index_struct_cls}
+
+        # NOTE: index_struct can have multiple types for backwards compatibility,
+        # map to same class
+        type_to_struct = {
+            index_type: cls.index_struct_cls
+            for index_type in cls.index_struct_cls.get_types()
+        }
+
+        docstore = DocumentStore.load_from_dict(
+            result_dict["docstore"],
+            type_to_struct=type_to_struct,
+        )
+        if "index_struct_id" in result_dict:
+            index_struct = docstore.get_document(index_struct_id)
+        return cls(index_struct=index_struct, docstore=docstore, **kwargs)
 
     @classmethod
     def load_from_string(cls, index_string: str, **kwargs: Any) -> "BaseGPTIndex":
@@ -415,21 +535,7 @@ class BaseGPTIndex(Generic[IS]):
 
         """
         result_dict = json.loads(index_string)
-        if "index_struct" in result_dict:
-            index_struct = cls.index_struct_cls.from_dict(result_dict["index_struct"])
-            index_struct_id = index_struct.get_doc_id()
-        elif "index_struct_id" in result_dict:
-            index_struct_id = result_dict["index_struct_id"]
-        else:
-            raise ValueError("index_struct or index_struct_id must be provided.")
-
-        type_to_struct = {cls.index_struct_cls.get_type(): cls.index_struct_cls}
-        docstore = DocumentStore.load_from_dict(
-            result_dict["docstore"],
-            type_to_struct=type_to_struct,
-        )
-        index_struct = docstore.get_document(index_struct_id)
-        return cls(index_struct=index_struct, docstore=docstore, **kwargs)
+        return cls.load_from_dict(result_dict, **kwargs)
 
     @classmethod
     def load_from_disk(cls, save_path: str, **kwargs: Any) -> "BaseGPTIndex":
@@ -455,6 +561,22 @@ class BaseGPTIndex(Generic[IS]):
             file_contents = f.read()
             return cls.load_from_string(file_contents, **kwargs)
 
+    def save_to_dict(self, **save_kwargs: Any) -> dict:
+        """Save to dict."""
+        if self.docstore.contains_index_struct(
+            exclude_ids=[self.index_struct.get_doc_id()]
+        ):
+            raise ValueError(
+                "Cannot call save index if index is composed on top of "
+                "other indices. Please define a `ComposableGraph` and use "
+                "`save_to_string` and `load_from_string` on that instead."
+            )
+        out_dict: Dict[str, Any] = {
+            "index_struct_id": self.index_struct.get_doc_id(),
+            "docstore": self.docstore.serialize_to_dict(),
+        }
+        return out_dict
+
     def save_to_string(self, **save_kwargs: Any) -> str:
         """Save to string.
 
@@ -468,18 +590,7 @@ class BaseGPTIndex(Generic[IS]):
             str: The JSON string of the index.
 
         """
-        if self.docstore.contains_index_struct(
-            exclude_ids=[self.index_struct.get_doc_id()]
-        ):
-            raise ValueError(
-                "Cannot call `save_to_string` on index if index is composed on top of "
-                "other indices. Please define a `ComposableGraph` and use "
-                "`save_to_string` and `load_from_string` on that instead."
-            )
-        out_dict: Dict[str, Any] = {
-            "index_struct_id": self.index_struct.get_doc_id(),
-            "docstore": self.docstore.serialize_to_dict(),
-        }
+        out_dict = self.save_to_dict(**save_kwargs)
         return json.dumps(out_dict, **save_kwargs)
 
     def save_to_disk(self, save_path: str, **save_kwargs: Any) -> None:

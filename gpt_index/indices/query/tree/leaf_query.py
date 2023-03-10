@@ -83,12 +83,17 @@ class GPTTreeIndexLeafQuery(BaseGPTIndexQuery[IndexGraph]):
             )
             self.response_builder.add_node_as_source(selected_node)
             # use response builder to get answer from node
-            node_text, _ = self._get_text_from_node(
+            node_text, sub_response = self._get_text_from_node(
                 query_bundle, selected_node, level=level
             )
+            if sub_response is not None:
+                # these are source nodes from within this node (when it's an index)
+                for source_node in sub_response.source_nodes:
+                    self.response_builder.add_source_node(source_node)
             cur_response = response_builder.get_response_over_chunks(
                 query_str, [node_text], prev_response=prev_response
             )
+            cur_response = cast(str, cur_response)
             logging.debug(f">[Level {level}] Current answer response: {cur_response} ")
         else:
             cur_response = self._query_level(
@@ -125,7 +130,12 @@ class GPTTreeIndexLeafQuery(BaseGPTIndexQuery[IndexGraph]):
         query_str = query_bundle.query_str
         cur_node_list = get_sorted_node_list(cur_nodes)
 
-        if self.child_branch_factor == 1:
+        if len(cur_node_list) == 1:
+            logging.debug(f">[Level {level}] Only one node left. Querying node.")
+            return self._query_with_selected_node(
+                cur_node_list[0], query_bundle, level=level
+            )
+        elif self.child_branch_factor == 1:
             query_template = self.query_template.partial_format(
                 num_chunks=len(cur_node_list), query_str=query_str
             )

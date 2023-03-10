@@ -1,6 +1,6 @@
 """List index.
 
-A simple data structure where GPT Index iterates through document chunks
+A simple data structure where LlamaIndex iterates through document chunks
 in sequence in order to answer a given query.
 
 """
@@ -14,6 +14,7 @@ from gpt_index.indices.query.list.embedding_query import GPTListIndexEmbeddingQu
 from gpt_index.indices.query.list.query import GPTListIndexQuery
 from gpt_index.indices.query.schema import QueryMode
 from gpt_index.langchain_helpers.chain_wrapper import LLMPredictor
+from gpt_index.langchain_helpers.text_splitter import TextSplitter
 from gpt_index.prompts.default_prompts import DEFAULT_TEXT_QA_PROMPT
 from gpt_index.prompts.prompts import QuestionAnswerPrompt
 from gpt_index.schema import BaseDocument
@@ -36,6 +37,7 @@ class GPTListIndex(BaseGPTIndex[IndexList]):
     Args:
         text_qa_template (Optional[QuestionAnswerPrompt]): A Question-Answer Prompt
             (see :ref:`Prompt-Templates`).
+            NOTE: this is a deprecated field.
 
     """
 
@@ -47,6 +49,7 @@ class GPTListIndex(BaseGPTIndex[IndexList]):
         index_struct: Optional[IndexList] = None,
         text_qa_template: Optional[QuestionAnswerPrompt] = None,
         llm_predictor: Optional[LLMPredictor] = None,
+        text_splitter: Optional[TextSplitter] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize params."""
@@ -55,12 +58,8 @@ class GPTListIndex(BaseGPTIndex[IndexList]):
             documents=documents,
             index_struct=index_struct,
             llm_predictor=llm_predictor,
+            text_splitter=text_splitter,
             **kwargs,
-        )
-        # NOTE: when building the list index, text_qa_template is not partially
-        # formatted because we don't know the query ahead of time.
-        self._text_splitter = self._prompt_helper.get_text_splitter_given_prompt(
-            self.text_qa_template, 1
         )
 
     @classmethod
@@ -70,6 +69,12 @@ class GPTListIndex(BaseGPTIndex[IndexList]):
             QueryMode.DEFAULT: GPTListIndexQuery,
             QueryMode.EMBEDDING: GPTListIndexEmbeddingQuery,
         }
+
+    def _build_fallback_text_splitter(self) -> TextSplitter:
+        # if not specified, use "smart" text splitter to ensure chunks fit in prompt
+        return self._prompt_helper.get_text_splitter_given_prompt(
+            self.text_qa_template, 1
+        )
 
     def _build_index_from_documents(
         self, documents: Sequence[BaseDocument]
@@ -82,19 +87,16 @@ class GPTListIndex(BaseGPTIndex[IndexList]):
         Returns:
             IndexList: The created list index.
         """
-        text_splitter = self._prompt_helper.get_text_splitter_given_prompt(
-            self.text_qa_template, 1
-        )
         index_struct = IndexList()
         for d in documents:
-            nodes = self._get_nodes_from_document(d, text_splitter)
+            nodes = self._get_nodes_from_document(d)
             for n in nodes:
                 index_struct.add_node(n)
         return index_struct
 
     def _insert(self, document: BaseDocument, **insert_kwargs: Any) -> None:
         """Insert a document."""
-        nodes = self._get_nodes_from_document(document, self._text_splitter)
+        nodes = self._get_nodes_from_document(document)
         for n in nodes:
             self._index_struct.add_node(n)
 
@@ -103,3 +105,9 @@ class GPTListIndex(BaseGPTIndex[IndexList]):
         cur_nodes = self._index_struct.nodes
         nodes_to_keep = [n for n in cur_nodes if n.ref_doc_id != doc_id]
         self._index_struct.nodes = nodes_to_keep
+
+    def _preprocess_query(self, mode: QueryMode, query_kwargs: Any) -> None:
+        """Preprocess query."""
+        super()._preprocess_query(mode, query_kwargs)
+        if "text_qa_template" not in query_kwargs:
+            query_kwargs["text_qa_template"] = self.text_qa_template

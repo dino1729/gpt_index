@@ -9,7 +9,7 @@ from gpt_index.readers.schema.base import Document
 class SimpleMongoReader(BaseReader):
     """Simple mongo reader.
 
-    Concatenates each Mongo doc into Document used by GPT Index.
+    Concatenates each Mongo doc into Document used by LlamaIndex.
 
     Args:
         host (str): Mongo host.
@@ -24,7 +24,7 @@ class SimpleMongoReader(BaseReader):
             import pymongo  # noqa: F401
             from pymongo import MongoClient  # noqa: F401
         except ImportError:
-            raise ValueError(
+            raise ImportError(
                 "`pymongo` package not found, please run `pip install pymongo`"
             )
         self.client: MongoClient = MongoClient(host, port)
