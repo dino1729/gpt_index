@@ -7,7 +7,7 @@ import os
 BUILD_MODE = True
 
 # Get API key from environment variable
-os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
+os.environ["OPENAI_API_KEY"] = os.environ.get("AZUREOPENAIAPIKEY")
 
 
 # Either build or load the document index
