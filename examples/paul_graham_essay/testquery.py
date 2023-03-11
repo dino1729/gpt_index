@@ -1,7 +1,7 @@
 import os
 
 # Get API key from environment variable
-os.environ["OPENAI_API_KEY"] = os.environ.get("AZUREOPENAIAPIKEY")
+os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 
 from IPython.display import Markdown, display
 

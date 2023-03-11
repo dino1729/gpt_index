@@ -1,13 +1,15 @@
 # try using GPT List Index!
+import os
+
 from langchain import OpenAI
 from langchain.agents import initialize_agent
+
 from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
-import os
 
 BUILD_MODE = True
 
 # Get API key from environment variable
-os.environ["OPENAI_API_KEY"] = os.environ.get("AZUREOPENAIAPIKEY")
+os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 
 
 # Either build or load the document index
