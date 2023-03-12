@@ -1,7 +1,8 @@
 import os
+
 from IPython.display import Markdown, display
+from llama_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 from pytube import YouTube
-from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")

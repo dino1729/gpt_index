@@ -5,9 +5,8 @@ from flask import Flask, redirect, render_template, request, url_for
 from IPython.display import Markdown, display
 from langchain import OpenAI
 from langchain.agents import initialize_agent
+from llama_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 from pytube import YouTube
-
-from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 
 BUILD_MODE = False
 

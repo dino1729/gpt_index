@@ -4,8 +4,7 @@ import os
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
 
 from IPython.display import Markdown, display
-
-from gpt_index import GPTSimpleVectorIndex, SimpleDirectoryReader
+from llama_index import GPTSimpleVectorIndex, SimpleDirectoryReader
 
 documents = SimpleDirectoryReader("data").load_data()
 index = GPTSimpleVectorIndex(documents)
