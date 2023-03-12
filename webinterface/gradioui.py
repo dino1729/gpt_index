@@ -4,6 +4,7 @@ from shutil import copyfileobj
 from urllib.parse import parse_qs, urlparse
 
 import gradio as gr
+import openai
 import PyPDF2
 import requests
 from bs4 import BeautifulSoup
@@ -17,6 +18,11 @@ from pytube import YouTube
 
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
+openai.api_key = os.environ.get("AZUREOPENAIAPIKEY")
+openai.api_base =  os.environ.get("AZUREOPENAIENDPOINT")
+openai.api_type = 'azure'
+openai.api_version = '2022-12-01' # this may change in the future
+
 UPLOAD_FOLDER = './data' # set the upload folder path
 example_queries = [["Generate key 5 point summary"], ["What are 5 main ideas of this article?"], ["What are the key lessons learned and insights in this video?"], ["List key insights and lessons learned from the paper"], ["What are the key takeaways from this article?"]]
 example_qs = []
@@ -24,6 +30,55 @@ example_qs = []
 #If the UPLOAD_FOLDER path does not exist, create it
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
+# Function to generate the trip plan
+def generate_trip_plan(city, days):
+    #prompt = f"Generate an itinerary for a trip to {city} for {days} days, making sure to cover all the popular tourist attractions."
+    prompt = f"List the popular tourist attractions in {city} including top rated restaurants that can be visited in {days} days. Be sure to arrage the places optimized for distance and time and output must contain a numbered list with a short, succinct description of each place."
+    completions = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=1024,
+        n=1,
+        stop=None,
+        temperature=0.5,
+    )
+    message = completions.choices[0].text
+    return f"Here is your trip plan for {city} for {days} day(s): {message}"
+
+def craving_satisfier(city,food_craving):
+    #If the food craving is input as "idk", generate a random food craving
+    if food_craving == "idk":
+        #Generate a random food craving
+        food_craving = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt="Generate a random food craving",
+            max_tokens=50,
+            n=1,
+            stop=None,
+            temperature=0.5,
+        )
+        food_craving = food_craving.choices[0].text
+        #Remove 2 new line characters from the beginning of the string
+        food_craving = food_craving[2:]
+        print(f"Don't worry, yo! I think you are craving for {food_craving}!")
+    else:
+        print(f"That's a great choice! My mouth is watering just thinking about {food_craving}!")
+
+    prompt = f"I'm looking for 3 restaurants in {city} that serves {food_craving}. Just give me a list of 3 restaurants with short address."
+    completions = openai.Completion.create(
+        engine="text-davinci-003",
+        prompt=prompt,
+        max_tokens=120,
+        n=1,
+        stop=None,
+        temperature=0.5,
+        top_p=1.0,
+    )
+    message = completions.choices[0].text
+    #Remove new line characters from the beginning of the string
+    message = message[1:]
+    return f'Here are 3 restaurants in {city} that serve {food_craving}! Bon Appetit!! {message}'
 
 def pdftotext(file_name):
     """
@@ -225,6 +280,10 @@ def cleartext(query, output):
   #Function to clear text
   return ["", ""]
 
+def clearhistory(field1,field2,field3):
+  #Function to clear history
+  return ["","",""]
+
 def example_generator():
     global example_queries, example_qs
     try:
@@ -253,12 +312,12 @@ def load_example(example_id):
 with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     gr.Markdown(
         """
-        <h1><center><b>chatPDF/chatVideo/chatArticle</center></h1>
+        <h1><center><b>LLM Bot</center></h1>
         """
     )
     gr.Markdown(
         """
-        This app uses the Transformer magic to answer questions about the content of a video, article or document. Either upload a document or enter a Youtube/Article URL to get started.
+        This app uses the Transformer magic to answer all your questions!
         """
     )
     with gr.Row():
@@ -291,6 +350,23 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
                 submit_button.click(ask, inputs=[query, state], outputs=[chatbot, state])
                 query.submit(ask, inputs=[query, state], outputs=[chatbot, state])
             clearchat_button = gr.Button("Clear Chat")
+    with gr.Row():
+        with gr.Tab(label="Trip Generator"):
+            with gr.Row():
+                city_name = gr.Textbox(placeholder="Enter the name of the city", label="City Name")
+                number_of_days = gr.Textbox(placeholder="Enter the number of days", label="Number of Days")
+                city_button = gr.Button("Plan").style(full_width=False)
+            with gr.Row():
+                city_output = gr.Textbox(label="Trip Plan")
+                clear_trip_button = gr.Button("Clear").style(full_width=False)
+        with gr.Tab(label="Cravings Generator"):
+            with gr.Row():
+                craving_city_name = gr.Textbox(placeholder="Enter the name of the city", label="City Name")
+                craving_cuisine = gr.Textbox(placeholder="What kind of food are you craving for?", label="Food")
+                craving_button = gr.Button("Cook").style(full_width=False)
+            with gr.Row():
+                craving_output = gr.Textbox(label="Food Places")
+                clear_craving_button = gr.Button("Clear").style(full_width=False)
 
     # Upload button for uploading files
     upload_button.click(upload_file, inputs=[files], outputs=[upload_output,examples,summary_output], show_progress=True)
@@ -298,12 +374,18 @@ with gr.Blocks(css="#chatbot .overflow-y-auto{height:500px}") as demo:
     download_button.click(download_ytvideo, inputs=[yturl], outputs=[download_output,examples,summary_output], show_progress=True)
     # Download button for downloading article
     adownload_button.click(download_art, inputs=[arturl], outputs=[adownload_output,examples,summary_output], show_progress=True)
+    # City Planner button
+    city_button.click(generate_trip_plan, inputs=[city_name,number_of_days], outputs=[city_output], show_progress=True)
+    # Cravings button
+    craving_button.click(craving_satisfier, inputs=[craving_city_name,craving_cuisine], outputs=[craving_output], show_progress=True)
 
     #Load example queries
     examples.click(load_example, inputs=[examples], outputs=[query])
 
     clearquery_button.click(cleartext, inputs=[query,query], outputs=[query,query])
     clearchat_button.click(cleartext, inputs=[query,chatbot], outputs=[query,chatbot])
+    clear_trip_button.click(clearhistory, inputs=[city_name,number_of_days,city_output], outputs=[city_name,number_of_days,city_output])
+    clear_craving_button.click(clearhistory, inputs=[craving_city_name,craving_cuisine,craving_output], outputs=[craving_city_name,craving_cuisine,craving_output])
 
     live = True
 
