@@ -18,10 +18,10 @@ from pytube import YouTube
 
 # Get API key from environment variable
 os.environ["OPENAI_API_KEY"] = os.environ.get("OPENAIAPIKEY")
-openai.api_key = os.environ.get("AZUREOPENAIAPIKEY")
-openai.api_base =  os.environ.get("AZUREOPENAIENDPOINT")
-openai.api_type = 'azure'
-openai.api_version = '2022-12-01' # this may change in the future
+openai.api_key = os.environ.get("OPENAIAPIKEY")
+#openai.api_base =  os.environ.get("AZUREOPENAIENDPOINT")
+#openai.api_type = 'azure'
+#openai.api_version = '2022-12-01' # this may change in the future
 
 UPLOAD_FOLDER = './data' # set the upload folder path
 example_queries = [["Generate key 5 point summary"], ["What are 5 main ideas of this article?"], ["What are the key lessons learned and insights in this video?"], ["List key insights and lessons learned from the paper"], ["What are the key takeaways from this article?"]]
