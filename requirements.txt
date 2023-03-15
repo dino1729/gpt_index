@@ -30,7 +30,7 @@ beautifulsoup4
 ffmpeg-python
 PyPDF2
 tiktoken
-gradio
+gradio==3.18.0
 IPython
 pydub
 ffmpeg
